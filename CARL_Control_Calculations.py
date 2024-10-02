@@ -116,117 +116,7 @@ def define_rover_1():
 experiment, end_event = experiment1()
 rover, planet = define_rover_1()
 
-''''
-###############################################
 
-
-Defined functions
-
-1. effcyfun
-    General Description:
-    Creates a function using the motor torque effiency 
-
-2. alphafun
-    General Description:
-    Creates a function using the terrain angle 
-    
-3. get mass
-    Mass of entire rover
-    --------------------
-    Inputs:  rover:  dict      Data structure containing rover parameters
-    Outputs:     m:  scalar    Rover mass [kg].
-
-4. get_gear_ratio
-    Inputs:  speed_reducer:  dict      Data dictionary specifying speed reducer parameters
-    Outputs:            Ng:  scalar    Speed ratio from input pinion shaft to output gear shaft. [-]
-
-5. tau_dcmotor
-    Inputs: omega:  numpy array      Motor shaft speed [rad/s]
-            motor:  dict             Data dictionary specifying motor parameters
-    Outputs:  tau:  numpy array        Torque at motor shaft [Nm].  Return argument is same size as first input argument.
-    
-6. F_rolling
-    Force of rolling resistance
-    ---------------------------
-    Inputs:           omega:  numpy array     Motor shaft speed [rad/s]
-              terrain_angle:  numpy array     Array of terrain angles [deg]
-                      rover:  dict            Data structure specifying rover parameters
-                     planet:  dict            Data dictionary specifying planetary parameters
-                        Crr:  scalar          Value of rolling resistance coefficient [-]
-    Outputs:            Frr:  numpy array     Array of forces [N]
-
-7. F_gravity
-    Inputs:  terrain_angle:  numpy array   Array of terrain angles [deg]
-                     rover:  dict          Data structure specifying rover parameters
-                    planet:  dict          Data dictionary specifying planetary parameters
-    Outputs:           Fgt:  numpy array   Array of forces [N]
-    
-8. F_drive
-    Inputs:  omega:  numpy array   Array of motor shaft speeds [rad/s]
-             rover:  dict          Data dictionary specifying rover parameters
-    
-    Outputs:    Fd:  numpy array   Array of drive forces [N]
-    
-9. F_net
-    Inputs:           omega:  list     Motor shaft speed [rad/s]
-              terrain_angle:  list     Array of terrain angles [deg]
-                      rover:  dict     Data structure specifying rover parameters
-                     planet:  dict     Data dictionary specifying planetary parameters
-                        Crr:  scalar   Value of rolling resistance coefficient [-]
-    Outputs:           Fnet:  list     Array of forces [N]
-
-10. motorW
-    General Description:
-        Compute the rotational speed of the motor shaft [rad/s] given the translational velocity of the rover and the rover dictionary. 
-    Inputs:         v:       1D numpy array or scalar float/int     Rover translational velocity [m/s]
-                rover:       dictionary                             Data structure containing rover parameters
-    Outputs:        w:       1D numpy array or scalar float/int     Motor speed [rad/s]. The return value should be the same 
-                                                                    size as input v.
-
-11. rover_dynamics
-    General Description:
-        This function computes the derivative of the state vector ([velocity, position]) for the rover given its current state. 
-    Inputs:              t:  scalar        Time sample [s]
-                         y:  numpy array   Two-element array of depenedent variables (rover velocity [m/s],rover position [m]) 
-                     rover:  dict          Data dictionary specifying rover parameters
-                    planet:  dict          Data dictionary specifying planetary parameters
-                experiment:  dict          Data dictionary specifying experiment paramaters
-    Outputs:          dydt:  numpy array   Two-element array of depenedent variables (rover acceleration [m/s^2],rover velocity [m/s])
-
-12. mechpower
-    General Description:
-        This function computes the instantaneous mechanical power output by a single DC motor at each point in a given velocity profile.
-    Inputs:         v:      1D numpy array or scalar float/int  - Rover velocity data obtained from a simulation [m/s]
-                rover:      dict                                - Data structure containing rover definition
-    Outputs:        P:      1D numpy array or scalar float/int  - Instantaneous power output of a single motor corresponding to each 
-                                                                  element in v [W]
-
-13. battenergy
-    General Description:
-        Compute the total electrical energy consumed from the rover battery pack over a simulation profile.
-    Inputs:         t:      1D numpy array     N-element array of time samples from a rover simulation [s]
-                    v:      1D numpy array     N-element array of rover velocity data from a simulation [m/s]
-                rover:      dict               Data structure containing rover definition
-    Outputs:        E:      scalar             Total electrical energy consumed from the rover battery pack over 
-                                               the input simulation profile. [J]
-
-14. simulate_rover
-    General Description:
-        Function to simulate the rover's movement and collect telemetry data.
-    Inputs:        rover:      dict    Data structure containing rover definition
-                  planet:      dict    Data structure containing planet terrain and environment
-              experiment:      dict    Data structure containing experiment conditions
-               end_event:      dict    Criteria to define the end of the simulation
-    Outputs:       rover:      dict    Updated rover dictionary with telemetry data
-
-15. end_of_mission_event
-    General Description:
-        Defines an event that terminates the mission simulation. Mission is over
-        when rover reaches a certain distance, has moved for a maximum simulation 
-        time or has reached a minimum velocity.            
-
-######################################################    
-'''
 def effcyfun():
     """General Description:
     Creates a function using the motor torque effiency 
@@ -253,7 +143,9 @@ def alphafun():
 
 
 def get_mass(rover):
-    """
+    """General Description:
+    Calculates total mass of rover
+    
     Inputs:  rover:  dict      Data structure containing rover parameters
     
     Outputs:     m:  scalar    Rover mass [kg].
@@ -276,9 +168,12 @@ def get_mass(rover):
 
 
 def get_gear_ratio(speed_reducer):
-    """
+    """General Description:
+    Finds gear ratio of gear box
+    
     Inputs:  speed_reducer:  dict      Data dictionary specifying speed
                                         reducer parameters
+                                        
     Outputs:            Ng:  scalar    Speed ratio from input pinion shaft
                                         to output gear shaft. Unitless.
     """
@@ -301,9 +196,12 @@ def get_gear_ratio(speed_reducer):
 
 
 def tau_dcmotor(omega, motor):
-    """
+    """General Description:
+    Calculates torque of motor
+    
     Inputs:  omega:  numpy array      Motor shaft speed [rad/s]
              motor:  dict             Data dictionary specifying motor parameters
+             
     Outputs:   tau:  numpy array      Torque at motor shaft [Nm].  Return argument
                                       is same size as first input argument.
     """
@@ -341,15 +239,16 @@ def tau_dcmotor(omega, motor):
 
 
 def F_rolling(omega, terrain_angle, rover, planet, Crr):
-    """
+    """General Description:
+    Calculates rolling force on the rover
+    
     Inputs:           omega:  numpy array     Motor shaft speed [rad/s]
               terrain_angle:  numpy array     Array of terrain angles [deg]
                       rover:  dict            Data structure specifying rover 
                                               parameters
                     planet:  dict            Data dictionary specifying planetary 
                                               parameters
-                        Crr:  scalar          Value of rolling resistance coefficient
-                                              [-]
+                        Crr:  scalar          Value of rolling resistance coefficient [-]
     
     Outputs:           Frr:  numpy array     Array of forces [N]
     """
@@ -409,7 +308,9 @@ def F_rolling(omega, terrain_angle, rover, planet, Crr):
 
 
 def F_gravity(terrain_angle, rover, planet):
-    """
+    """General Description:
+    Calculates force of gravity on the rover
+    
     Inputs:  terrain_angle:  numpy array   Array of terrain angles [deg]
                      rover:  dict          Data structure specifying rover 
                                             parameters
@@ -449,7 +350,9 @@ def F_gravity(terrain_angle, rover, planet):
 
 
 def F_drive(omega, rover):
-    """
+    """General Description:
+    Calculates required drice force to accelerate rover
+    
     Inputs:  omega:  numpy array   Array of motor shaft speeds [rad/s]
              rover:  dict          Data dictionary specifying rover parameters
     
@@ -486,7 +389,9 @@ def F_drive(omega, rover):
 
 
 def F_net(omega, terrain_angle, rover, planet, Crr):
-    """
+    """General Description:
+    Calculates net force acting on the rover
+    
     Inputs:           omega:  list     Motor shaft speed [rad/s]
               terrain_angle:  list     Array of terrain angles [deg]
                       rover:  dict     Data structure specifying rover 
@@ -547,10 +452,10 @@ def F_net(omega, terrain_angle, rover, planet, Crr):
     
     return Fnet
 
+
 def motorW(v, rover):
-    """
-    General Description:
-        Compute the rotational speed of the motor shaft [rad/s] given the translational velocity of the rover and the rover dictionary.
+    """General Description:
+    Compute the rotational speed of the motor shaft [rad/s] given the translational velocity of the rover and the rover dictionary.
     
     Inputs:         v:       1D numpy array or scalar float/int     Rover translational velocity [m/s]
                 rover:       dictionary                             Data structure containing rover parameters
@@ -584,9 +489,8 @@ def motorW(v, rover):
 
 
 def rover_dynamics(t, y, rover, planet, experiment):
-    """
-    General Description:
-        This function computes the derivative of the state vector ([velocity, position]) for the rover given its current state. 
+    """General Description:
+    This function computes the derivative of the state vector ([velocity, position]) for the rover given its current state. 
         
     Inputs:              t:  scalar        Time sample [s]
                          y:  numpy array   Two-element array of depenedent variables (rover velocity [m/s],rover position [m]) 
@@ -652,9 +556,8 @@ def rover_dynamics(t, y, rover, planet, experiment):
 
 
 def mechpower(v,rover):
-    """
-    General Description:
-        This function computes the instantaneous mechanical power output by a single DC motor at each point in a given velocity profile.
+    """General Description:
+    This function computes the instantaneous mechanical power output by a single DC motor at each point in a given velocity profile.
     
     Inputs:         v:      1D numpy array or scalar float/int  - Rover velocity data obtained from a simulation [m/s]
                 rover:      dict                                - Data structure containing rover definition
@@ -693,9 +596,8 @@ def mechpower(v,rover):
     return P
 
 def battenergy(t, v, rover):
-    """
-    General Description:
-        Compute the total electrical energy consumed from the rover battery pack over a simulation profile.
+    """General Description:
+    Compute the total electrical energy consumed from the rover battery pack over a simulation profile.
     
     Inputs:         t:      1D numpy array     N-element array of time samples from a rover simulation [s]
                     v:      1D numpy array     N-element array of rover velocity data from a simulation [m/s]
@@ -752,9 +654,8 @@ def battenergy(t, v, rover):
     return E
 
 def simulate_rover(rover, planet, experiment, end_event):
-    """
-    General Description:
-        Function to simulate the rover's movement and collect telemetry data.
+    """General Description:
+    Function to simulate the rover's movement and collect telemetry data.
 
     Inputs:        rover:      dict    Data structure containing rover definition
                   planet:      dict    Data structure containing planet terrain and environment
