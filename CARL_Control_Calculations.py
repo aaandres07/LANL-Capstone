@@ -690,6 +690,12 @@ def simulate_rover(rover, planet, experiment, end_event):
     vel = est.y[0,:]
     time = est.t
     
+    #Represent deceleration at the end of mission to catch glider (last 15 seconds)
+    vel[-10:] = np.linspace(vel[-11], 0, 10)
+    
+    #Represent deceleration during mission due to possible turns
+    vel[-10:] = np.linspace(vel[-11], 0, 10)
+    
     # Compute power and energy using auxiliary functions
     P = mechpower(vel,rover)
     E = battenergy(time, vel, rover)
@@ -745,7 +751,7 @@ def end_of_mission_event(end_event):
     
     return events
 
-
+time = battery_energy = simulate_rover(rover, planet, experiment, end_event)['telemetry']['Time']
 battery_energy = simulate_rover(rover, planet, experiment, end_event)['telemetry']['battery_energy']
 energy_per_distance = simulate_rover(rover, planet, experiment, end_event)['telemetry']['energy_per_distance']
 distance_traveled = simulate_rover(rover, planet, experiment, end_event)['telemetry']['distance_traveled']
@@ -755,11 +761,12 @@ power = simulate_rover(rover, planet, experiment, end_event)['telemetry']['power
 max_power = simulate_rover(rover, planet, experiment, end_event)['telemetry']['max_power']
 max_velocity = simulate_rover(rover, planet, experiment, end_event)['telemetry']['max_velocity']
 
-print("Battery Energy Consumed = {:.2f} J".format(battery_energy))
-print("Energy Per Distance = {:.2f} J/m".format(energy_per_distance))
+#print("Battery Energy Consumed = {:.2f} J".format(battery_energy))
+#print("Energy Per Distance = {:.2f} J/m".format(energy_per_distance))
 print("Max Power = {:.2f} W".format(max_power))
 print("Distance Traveled = {:.2f} miles".format(distance_traveled/1609))
 print("Completion Time = {:.2f} min".format(completion_time/60))
 print("Max Velocity = {:.2f} mph".format(max_velocity*2.237))
 #print("Velocity = {}".format(velocity))
 #print("Power = {}".format(power))
+
