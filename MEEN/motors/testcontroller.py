@@ -7,7 +7,7 @@ motor2 = Motor(forward=22, backward=23)
 
 DEADZONE = 10
 
-ps5_controller = InputDevice('/dev/input/event0')
+ps5_controller = InputDevice('/dev/input/event8')
 print(f"Connected to {ps5_controller.name} at {ps5_controller.path}")
 
 def control_motor(motor, value):
