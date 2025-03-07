@@ -10,7 +10,7 @@ BAUD_RATE = 115200
 
 # Update the event device for your PS5 controller.
 # You can list devices with: "ls /dev/input/" and then use evdev to list capabilities.
-PS5_DEVICE = '/dev/input/eventX'  # <-- Replace X with your device number
+PS5_DEVICE = '/dev/input/event8'  # <-- Replace X with your device number
 
 # ---- Setup Serial and Controller Device ----
 ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1)
