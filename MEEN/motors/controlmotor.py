@@ -1,59 +1,70 @@
-#!/usr/bin/env python3
-import serial
 import time
-from evdev import InputDevice, ecodes, categorize
+import serial
+from evdev import InputDevice, categorize, ecodes
 
-# ---- Configuration ----
-# Update the serial port to match your Arduino’s connection (e.g., /dev/ttyACM0 or /dev/ttyUSB0)
-SERIAL_PORT = '/dev/ttyACM0'
-BAUD_RATE = 115200
+# --------------------------------------------------
+# 1. Configure your serial connection to Arduino:
+# --------------------------------------------------
+# Replace '/dev/ttyACM0' with the correct port for your Arduino.
+arduino_port = '/dev/ttyACM0'
+baud_rate = 115200
 
-# Update the event device for your PS5 controller.
-# You can list devices with: "ls /dev/input/" and then use evdev to list capabilities.
-PS5_DEVICE = '/dev/input/event8'  # <-- Replace X with your device number
+try:
+    ser = serial.Serial(arduino_port, baud_rate, timeout=1)
+    print(f"Connected to Arduino on {arduino_port}")
+except Exception as e:
+    print(f"Error opening serial port: {e}")
+    exit(1)
 
-# ---- Setup Serial and Controller Device ----
-ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1)
-device = InputDevice(PS5_DEVICE)
+# --------------------------------------------------
+# 2. Identify the PS5 controller device path
+# --------------------------------------------------
+# Update '/dev/input/eventX' to match your system.
+controller_path = '/dev/input/event8'
+try:
+    gamepad = InputDevice(controller_path)
+    print(f"Listening to {gamepad.name} at {controller_path}")
+except OSError:
+    print(f"Could not find a device at {controller_path}. Update the path!")
+    exit(1)
 
-# Give time for the serial port to initialize.
-time.sleep(2)
+# --------------------------------------------------
+# 3. Joystick data and scaling
+# --------------------------------------------------
+# Your PS5 controller now reports -128..128 on each axis.
+# We’ll map that to -255..255 for motor speed.
 
-# ---- Mapping Function ----
-def map_joystick_to_pwm(val, dead_zone=300):
-    """
-    Maps a joystick value (assumed range -32768 to 32767) to a PWM pulse width (500 to 2500 µs).
-    If the value is within a dead zone around 0, returns neutral (1500 µs).
-    """
-    if abs(val) < dead_zone:
-        return 1500
-    # Scale: full negative (-32768) -> 500 µs, full positive (32767) -> 2500 µs
-    pwm = 1500 + int((val / 32767.0) * 1000)
-    return max(500, min(2500, pwm))
+def scale_joystick_value(value, in_min=-128, in_max=128, out_min=-255, out_max=255):
+    # Scale from one range to another
+    # e.g. -128..128 -> -255..255
+    return int((value - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)
 
-# Initialize joystick values.
 left_y = 0
 right_y = 0
 
-print("Starting control loop. Use CTRL+C to exit.")
-# ---- Main Event Loop ----
-for event in device.read_loop():
-    # We only care about absolute axis events.
-    if event.type == ecodes.EV_ABS:
-        # The PS5 controller typically uses:
-        #   ABS_Y for the left joystick vertical axis,
-        #   ABS_RY for the right joystick vertical axis.
-        if event.code == ecodes.ABS_Y:
-            left_y = event.value
-        elif event.code == ecodes.ABS_RY:
-            right_y = event.value
+# --------------------------------------------------
+# 4. Main loop: read events, parse joystick positions, send to Arduino
+# --------------------------------------------------
+try:
+    for event in gamepad.read_loop():
+        # We only care about absolute axis events
+        if event.type == ecodes.EV_ABS:
+            if event.code == ecodes.ABS_Y:    # Left stick Y
+                left_y = scale_joystick_value(event.value)
+            elif event.code == ecodes.ABS_RY: # Right stick Y
+                right_y = scale_joystick_value(event.value)
 
-        # Map the raw axis values to PWM pulse widths.
-        left_pwm = map_joystick_to_pwm(left_y)
-        right_pwm = map_joystick_to_pwm(right_y)
+            # --------------------------------------------------
+            # SEND UPDATED VALUES TO ARDUINO
+            # --------------------------------------------------
+            # Format a simple comma-separated string: "LY:<val>,RY:<val>\n"
+            cmd = f"LY:{left_y},RY:{right_y}\n"
+            ser.write(cmd.encode('utf-8'))
 
-        # Create a command string: "left_pwm,right_pwm\n"
-        command = f"{left_pwm},{right_pwm}\n"
-        ser.write(command.encode('utf-8'))
-        # Optionally, print the values for debugging.
-        print(f"Sent: {command.strip()}")
+except KeyboardInterrupt:
+    print("Exiting program...")
+except Exception as e:
+    print(f"An error occurred: {e}")
+finally:
+    if ser.is_open:
+        ser.close()
