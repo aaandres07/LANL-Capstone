@@ -1,44 +1,59 @@
-import evdev
-from evdev import InputDevice, categorize, ecodes
-from gpiozero import Motor
-from time import sleep
+#!/usr/bin/env python3
+import serial
+import time
+from evdev import InputDevice, ecodes, categorize
 
-# Initialize the motors using gpiozero
-motor1 = Motor(forward=17, backward=18)  # Motor 1 on GPIO pins 17 and 18
-motor2 = Motor(forward=22, backward=23)  # Motor 2 on GPIO pins 22 and 23
+# ---- Configuration ----
+# Update the serial port to match your Arduino’s connection (e.g., /dev/ttyACM0 or /dev/ttyUSB0)
+SERIAL_PORT = '/dev/ttyACM0'
+BAUD_RATE = 115200
 
-# Deadzone threshold for analog sticks (to avoid jitter)
-DEADZONE = 10
+# Update the event device for your PS5 controller.
+# You can list devices with: "ls /dev/input/" and then use evdev to list capabilities.
+PS5_DEVICE = '/dev/input/eventX'  # <-- Replace X with your device number
 
-# Controller setup (ensure the correct event device is used)
-ps5_controller = InputDevice('/dev/input/event0')  # Find your controller device path
-print(f"Connected to {ps5_controller.name} at {ps5_controller.path}")
+# ---- Setup Serial and Controller Device ----
+ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1)
+device = InputDevice(PS5_DEVICE)
 
-# Motor control functions
-def control_motor(motor, value):
-    """Control motor based on joystick value."""
-    if value < (128 - DEADZONE):  # Forward
-        motor.forward()
-    elif value > (128 + DEADZONE):  # Backward
-        motor.backward()
-    else:  # Stop (value within deadzone)
-        motor.stop()
+# Give time for the serial port to initialize.
+time.sleep(2)
 
-# Main loop to read inputs from the controller
-try:
-    for event in ps5_controller.read_loop():
-        if event.type == ecodes.EV_ABS:
-            absevent = categorize(event)
+# ---- Mapping Function ----
+def map_joystick_to_pwm(val, dead_zone=300):
+    """
+    Maps a joystick value (assumed range -32768 to 32767) to a PWM pulse width (500 to 2500 µs).
+    If the value is within a dead zone around 0, returns neutral (1500 µs).
+    """
+    if abs(val) < dead_zone:
+        return 1500
+    # Scale: full negative (-32768) -> 500 µs, full positive (32767) -> 2500 µs
+    pwm = 1500 + int((val / 32767.0) * 1000)
+    return max(500, min(2500, pwm))
 
-            # Left stick vertical axis (ABS_Y) to control motor 1
-            if absevent.event.code == ecodes.ABS_Y:
-                control_motor(motor1, absevent.event.value)
+# Initialize joystick values.
+left_y = 0
+right_y = 0
 
-            # Right stick vertical axis (ABS_RY) to control motor 2
-            if absevent.event.code == ecodes.ABS_RY:
-                control_motor(motor2, absevent.event.value)
+print("Starting control loop. Use CTRL+C to exit.")
+# ---- Main Event Loop ----
+for event in device.read_loop():
+    # We only care about absolute axis events.
+    if event.type == ecodes.EV_ABS:
+        # The PS5 controller typically uses:
+        #   ABS_Y for the left joystick vertical axis,
+        #   ABS_RY for the right joystick vertical axis.
+        if event.code == ecodes.ABS_Y:
+            left_y = event.value
+        elif event.code == ecodes.ABS_RY:
+            right_y = event.value
 
-except KeyboardInterrupt:
-    print("Stopping motors and exiting...")
-    motor1.stop()
-    motor2.stop()
+        # Map the raw axis values to PWM pulse widths.
+        left_pwm = map_joystick_to_pwm(left_y)
+        right_pwm = map_joystick_to_pwm(right_y)
+
+        # Create a command string: "left_pwm,right_pwm\n"
+        command = f"{left_pwm},{right_pwm}\n"
+        ser.write(command.encode('utf-8'))
+        # Optionally, print the values for debugging.
+        print(f"Sent: {command.strip()}")
