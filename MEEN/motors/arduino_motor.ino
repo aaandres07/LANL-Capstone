@@ -12,7 +12,7 @@ bool newData = false;
 void setup() {
   Serial.begin(115200);
   
-  // Attach the servos to appropriate digital pins (update the pins if needed).
+  // Attach the servos to appropriate digital pins
   leftMotor.attach(9);
   rightMotor.attach(10);
   
@@ -23,14 +23,22 @@ void setup() {
 }
 
 void loop() {
-  // Read serial input.
   recvWithEndMarker();
   
   if (newData) {
-    // Expecting data in the format: "leftPWM,rightPWM"
     int leftPWM, rightPWM;
     if (sscanf(receivedChars, "%d,%d", &leftPWM, &rightPWM) == 2) {
-      // Output the pulse widths to the ESC channels.
+      // Constrain PWM values to the valid range for the ESC
+      leftPWM = constrain(leftPWM, 500, 2500);
+      rightPWM = constrain(rightPWM, 500, 2500);
+
+      // Print received values for debugging
+      Serial.print("Received PWM: ");
+      Serial.print(leftPWM);
+      Serial.print(", ");
+      Serial.println(rightPWM);
+
+      // Output the pulse widths to the ESC channels
       leftMotor.writeMicroseconds(leftPWM);
       rightMotor.writeMicroseconds(rightPWM);
     }
