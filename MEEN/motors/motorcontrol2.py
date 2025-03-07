@@ -16,16 +16,16 @@ if controller is None:
     exit(1)
 
 # --- Open Serial Port to Arduino ---
-# Adjust '/dev/ttyACM0' as needed for your system.
 ser = serial.Serial('/dev/ttyACM0', 115200, timeout=1)
 time.sleep(2)  # Wait for Arduino to reset
 
 # --- Helper Function to Map Joystick Value to PWM ---
 def joystick_to_pwm(val):
-    # Map -128..128 to 500..2500 (1500 is neutral)
-    return int(1500 + (val / 128.0) * 1000)
+    # PS5 joystick range: -32768 to 32767 (should be -128 to 128)
+    normalized_val = val / 32767  # Normalize to -1.0 to 1.0
+    return int(1500 + (normalized_val * 1000))  # Map to 500 - 2500µs
 
-# Initialize joystick values (assumed 0 at start => neutral)
+# Initialize joystick values (neutral)
 left_val = 0
 right_val = 0
 
@@ -44,8 +44,13 @@ for event in controller.read_loop():
         left_pwm = joystick_to_pwm(left_val)
         right_pwm = joystick_to_pwm(right_val)
 
+        # Print Debugging Information
+        print(f"Raw Joystick: Left={left_val}, Right={right_val}")
+        print(f"Mapped PWM: Left={left_pwm}, Right={right_pwm}")
+
         # Create command string (e.g., "1500,1500\n")
         command = f"{left_pwm},{right_pwm}\n"
+        print(f"Sending: {command.strip()}")  # Print the actual command sent
         ser.write(command.encode('utf-8'))
 
         # Read Arduino response
