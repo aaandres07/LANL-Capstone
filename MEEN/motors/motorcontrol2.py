@@ -47,3 +47,8 @@ for event in controller.read_loop():
         # Create command string (e.g., "1500,1500\n")
         command = f"{left_pwm},{right_pwm}\n"
         ser.write(command.encode('utf-8'))
+
+        # Read Arduino response
+        response = ser.readline().decode('utf-8').strip()
+        if response:
+            print(f"Arduino: {response}")  # Print what Arduino sends back
