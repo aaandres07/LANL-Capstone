@@ -9,7 +9,7 @@ SERIAL_PORT = '/dev/ttyACM0'
 BAUD_RATE = 9600
 
 # Set the event device path for your PS5 controller (update this path accordingly)
-CONTROLLER_DEVICE = '/dev/input/eventX'  # e.g., '/dev/input/event0'
+CONTROLLER_DEVICE = '/dev/input/event8'  # e.g., '/dev/input/event0'
 
 # Create a serial connection to the Arduino
 ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1)
