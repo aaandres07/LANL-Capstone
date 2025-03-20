@@ -19,6 +19,10 @@ if controller is None:
 ser = serial.Serial('/dev/ttyACM0', 115200, timeout=1)
 time.sleep(2)  # Wait for Arduino to reset
 
+# Define baseline offsets and deadzone threshold
+RIGHT_TRIGGER_BASELINE = 20   # Adjust this after testing your raw values
+DEADZONE = 5
+
 # Initialize trigger values
 left_trigger = 0   # Typically from ABS_Z (L2)
 right_trigger = 0  # Typically from ABS_RZ (R2)
@@ -27,20 +31,23 @@ print("Starting control loop. Use L2 and R2 to control the motors.")
 
 for event in controller.read_loop():
     if event.type == ecodes.EV_ABS:
-        # Update left trigger value
         if event.code == ecodes.ABS_Z:
             left_trigger = event.value
-        # Update right trigger value
         elif event.code == ecodes.ABS_RZ:
             right_trigger = event.value
 
-        # Calculate net speed: (R2 value) - (L2 value)
-        net_speed = right_trigger - left_trigger
+        # Adjust the right trigger value by subtracting its baseline
+        effective_right = max(0, right_trigger - RIGHT_TRIGGER_BASELINE)
+        net_speed = effective_right - left_trigger
 
-        # For debugging: display the raw trigger values and the computed net speed
-        print(f"Left Trigger: {left_trigger}, Right Trigger: {right_trigger}, Net Speed: {net_speed}")
+        # Apply deadzone: if the net_speed is very small, treat it as zero
+        if abs(net_speed) < DEADZONE:
+            net_speed = 0
 
-        # Send the net speed over serial (e.g., "120\n" or "-100\n")
+        # Debug prints for monitoring
+        print(f"Left Trigger: {left_trigger}, Right Trigger: {right_trigger} (Effective: {effective_right}), Net Speed: {net_speed}")
+
+        # Send the net speed over serial (as a string with newline)
         command = f"{net_speed}\n"
         print(f"Sending: {command.strip()}")
         ser.write(command.encode('utf-8'))
