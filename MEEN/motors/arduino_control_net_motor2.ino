@@ -1,22 +1,25 @@
 /*
-  Arduino Motor Controller for 2-Channel Driver
-  Adapted for your current motor driver:
-    - Motor 1: IN1 (D2), IN2 (D3), ENA (D6, PWM)
-    - Motor 2: IN3 (D4), IN4 (D5), ENB (D7, PWM)
+  Arduino Motor Controller for 2-Channel Driver (Full Speed Digital Control)
+  Pin assignments:
+    - Motor 1: IN1 = D2, IN2 = D3, ENA (digital) = D6
+    - Motor 2: IN3 = D4, IN4 = D5, ENB (digital) = D7
   
-  The Arduino reads a net speed (–255 to 255) from the Raspberry Pi.
-  A positive value drives the motors forward;
-  a negative value drives them in reverse.
+  The Arduino reads a command from the Raspberry Pi:
+    "255" for full-speed forward,
+    "-255" for full-speed reverse,
+    "0" to stop.
+  
+  Full-speed is achieved by simply setting the enable pins HIGH (and LOW to stop).
 */
 
 const int IN1 = 2;
 const int IN2 = 3;
 const int IN3 = 4;
 const int IN4 = 5;
-const int ENA = 6;  // PWM pin for Motor 1
-const int ENB = 7;  // PWM pin for Motor 2
+const int ENA = 6;  // Digital control for Motor 1
+const int ENB = 7;  // Digital control for Motor 2
 
-String inputString = "";   // A string to hold incoming data
+String inputString = "";   // Buffer for incoming serial data
 bool stringComplete = false;
 
 void setup() {
@@ -28,8 +31,16 @@ void setup() {
   pinMode(ENA, OUTPUT);
   pinMode(ENB, OUTPUT);
 
+  // Initialize all pins to LOW (motors off)
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, LOW);
+  digitalWrite(ENA, LOW);
+  digitalWrite(ENB, LOW);
+
   Serial.begin(115200);
-  Serial.println("Motor controller ready.");
+  Serial.println("Motor controller ready (full-speed digital control).");
 }
 
 void loop() {
@@ -45,45 +56,39 @@ void loop() {
 
   // If a complete command is received, process it
   if (stringComplete) {
-    int netSpeed = inputString.toInt();
+    int command = inputString.toInt();
     inputString = "";
     stringComplete = false;
 
-    // Constrain the value to -255 to 255
-    if (netSpeed > 255) {
-      netSpeed = 255;
-    } else if (netSpeed < -255) {
-      netSpeed = -255;
-    }
-
-    // Set motor directions based on netSpeed
-    if (netSpeed > 0) {
-      // Forward: Motor 1 and Motor 2
+    if (command > 0) {
+      // Full forward
       digitalWrite(IN1, HIGH);
       digitalWrite(IN2, LOW);
       digitalWrite(IN3, HIGH);
       digitalWrite(IN4, LOW);
-    } else if (netSpeed < 0) {
-      // Reverse: Motor 1 and Motor 2
+      // Set enable pins HIGH for full power
+      digitalWrite(ENA, HIGH);
+      digitalWrite(ENB, HIGH);
+    } else if (command < 0) {
+      // Full reverse
       digitalWrite(IN1, LOW);
       digitalWrite(IN2, HIGH);
       digitalWrite(IN3, LOW);
       digitalWrite(IN4, HIGH);
+      digitalWrite(ENA, HIGH);
+      digitalWrite(ENB, HIGH);
     } else {
-      // Stop: Disable motor outputs
+      // Stop: disable motor outputs
       digitalWrite(IN1, LOW);
       digitalWrite(IN2, LOW);
       digitalWrite(IN3, LOW);
       digitalWrite(IN4, LOW);
+      digitalWrite(ENA, LOW);
+      digitalWrite(ENB, LOW);
     }
 
-    // Use the absolute value for PWM speed
-    int pwmSpeed = abs(netSpeed);
-    analogWrite(ENA, pwmSpeed);
-    analogWrite(ENB, pwmSpeed);
-
-    // Send feedback over Serial (optional)
-    Serial.print("Speed set to: ");
-    Serial.println(netSpeed);
+    // Optionally, send feedback over Serial
+    Serial.print("Command received: ");
+    Serial.println(command);
   }
 }
