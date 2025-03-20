@@ -5,7 +5,7 @@ import time
 from evdev import InputDevice, categorize, ecodes
 
 # Replace '/dev/input/eventX' with the correct device for your PS5 controller
-GAMEPAD_DEVICE = '/dev/input/eventX'
+GAMEPAD_DEVICE = '/dev/input/event8'
 
 # Replace '/dev/ttyACM0' with whichever port your Arduino shows up on
 ARDUINO_PORT = '/dev/ttyACM0'
