@@ -35,7 +35,7 @@ for event in controller.read_loop():
         elif event.code == ecodes.ABS_RZ:
             right_trigger = event.value
 
-        net_speed = effective_right - left_trigger
+        net_speed = right_trigger - left_trigger
 
         # Apply deadzone: if net_speed is small, treat it as zero
         if abs(net_speed) < DEADZONE:
@@ -49,7 +49,7 @@ for event in controller.read_loop():
         else:
             command = "0\n"
 
-        print(f"Left Trigger: {left_trigger}, Right Trigger: {right_trigger} (Effective Right: {effective_right}), Net: {net_speed}")
+        print(f"Left Trigger: {left_trigger}, Right Trigger: {right_trigger}, Net: {net_speed}")
         print(f"Sending command: {command.strip()}")
         ser.write(command.encode('utf-8'))
 
