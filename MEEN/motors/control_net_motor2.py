@@ -1,60 +1,51 @@
 #!/usr/bin/env python3
-
 import serial
 import time
-from evdev import InputDevice, categorize, ecodes
+from evdev import InputDevice, categorize, ecodes, list_devices
 
-# Replace '/dev/input/eventX' with the correct device for your PS5 controller
-GAMEPAD_DEVICE = '/dev/input/event8'
+# Find the PS5 Controller (DualSense or Wireless Controller)
+devices = [InputDevice(path) for path in list_devices()]
+controller = None
+for device in devices:
+    if 'Wireless Controller' in device.name or 'DualSense' in device.name:
+        controller = device
+        break
 
-# Replace '/dev/ttyACM0' with whichever port your Arduino shows up on
-ARDUINO_PORT = '/dev/ttyACM0'
-BAUD_RATE = 115200
+if controller is None:
+    print("PS5 controller not found. Please connect your controller.")
+    exit(1)
 
-def main():
-    # Initialize serial to Arduino
-    arduino = serial.Serial(ARDUINO_PORT, BAUD_RATE, timeout=1)
-    time.sleep(2)  # Give the serial port a moment to set up
+# Open Serial Port to Arduino 
+ser = serial.Serial('/dev/ttyACM0', 115200, timeout=1)
+time.sleep(2)  # Wait for Arduino to reset
 
-    # Open the controller device
-    gamepad = InputDevice(GAMEPAD_DEVICE)
+# Initialize trigger values
+left_trigger = 0   # Typically from ABS_Z (L2)
+right_trigger = 0  # Typically from ABS_RZ (R2)
 
-    left_trigger_value = 0
-    right_trigger_value = 0
+print("Starting control loop. Use L2 and R2 to control the motors.")
 
-    print("Listening for PS5 controller events...")
-    try:
-        for event in gamepad.read_loop():
-            if event.type == ecodes.EV_ABS:
-                # Check if it's the left trigger (L2)
-                if event.code == ecodes.ABS_Z:
-                    left_trigger_value = event.value
-                # Check if it's the right trigger (R2)
-                elif event.code == ecodes.ABS_RZ:
-                    right_trigger_value = event.value
+for event in controller.read_loop():
+    if event.type == ecodes.EV_ABS:
+        # Update left trigger value
+        if event.code == ecodes.ABS_Z:
+            left_trigger = event.value
+        # Update right trigger value
+        elif event.code == ecodes.ABS_RZ:
+            right_trigger = event.value
 
-                # Each trigger typically ranges from 0 to 255
-                # We'll treat the right trigger as forward, left trigger as reverse
+        # Calculate net speed: (R2 value) - (L2 value)
+        net_speed = right_trigger - left_trigger
 
-                # net_speed = (right trigger) - (left trigger)
-                net_speed = right_trigger_value - left_trigger_value
+        # For debugging: display the raw trigger values and the computed net speed
+        print(f"Left Trigger: {left_trigger}, Right Trigger: {right_trigger}, Net Speed: {net_speed}")
 
-                # Clamp net_speed to -255..255 for safety
-                if net_speed > 255:
-                    net_speed = 255
-                elif net_speed < -255:
-                    net_speed = -255
+        # Send the net speed over serial (e.g., "120\n" or "-100\n")
+        command = f"{net_speed}\n"
+        print(f"Sending: {command.strip()}")
+        ser.write(command.encode('utf-8'))
 
-                # Send the speed value as text, followed by newline
-                # Arduino will parse it
-                speed_str = f"{net_speed}\n"
-                arduino.write(speed_str.encode())
-
-    except KeyboardInterrupt:
-        print("Exiting...")
-
-    finally:
-        arduino.close()
-
-if __name__ == "__main__":
-    main()
+        # Optionally read Arduino feedback
+        response = ser.readline().decode('utf-8').strip()
+        if response:
+            print(f"Arduino: {response}")
