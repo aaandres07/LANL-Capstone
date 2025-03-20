@@ -19,15 +19,14 @@ if controller is None:
 ser = serial.Serial('/dev/ttyACM0', 115200, timeout=1)
 time.sleep(2)  # Wait for Arduino to reset
 
-# Define baseline offsets and deadzone threshold
-RIGHT_TRIGGER_BASELINE = 20   # Adjust this after testing your raw values
-DEADZONE = 5
+# Define deadzone threshold
+DEADZONE = 10  # Any net value below this is treated as zero
 
 # Initialize trigger values
 left_trigger = 0   # Typically from ABS_Z (L2)
 right_trigger = 0  # Typically from ABS_RZ (R2)
 
-print("Starting control loop. Use L2 and R2 to control the motors.")
+print("Starting full-speed control loop. Use L2 and R2 for reverse/forward.")
 
 for event in controller.read_loop():
     if event.type == ecodes.EV_ABS:
@@ -36,23 +35,25 @@ for event in controller.read_loop():
         elif event.code == ecodes.ABS_RZ:
             right_trigger = event.value
 
-        # Adjust the right trigger value by subtracting its baseline
-        effective_right = max(0, right_trigger - RIGHT_TRIGGER_BASELINE)
         net_speed = effective_right - left_trigger
 
-        # Apply deadzone: if the net_speed is very small, treat it as zero
+        # Apply deadzone: if net_speed is small, treat it as zero
         if abs(net_speed) < DEADZONE:
             net_speed = 0
 
-        # Debug prints for monitoring
-        print(f"Left Trigger: {left_trigger}, Right Trigger: {right_trigger} (Effective: {effective_right}), Net Speed: {net_speed}")
+        # Instead of variable speed, send full speed commands:
+        if net_speed > 0:
+            command = "255\n"
+        elif net_speed < 0:
+            command = "-255\n"
+        else:
+            command = "0\n"
 
-        # Send the net speed over serial (as a string with newline)
-        command = f"{net_speed}\n"
-        print(f"Sending: {command.strip()}")
+        print(f"Left Trigger: {left_trigger}, Right Trigger: {right_trigger} (Effective Right: {effective_right}), Net: {net_speed}")
+        print(f"Sending command: {command.strip()}")
         ser.write(command.encode('utf-8'))
 
-        # Optionally read Arduino feedback
+        # Optionally, read Arduino feedback
         response = ser.readline().decode('utf-8').strip()
         if response:
             print(f"Arduino: {response}")
