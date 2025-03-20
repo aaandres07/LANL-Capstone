@@ -1,4 +1,4 @@
-// Define motor driver pin assignments
+// Define motor driver pin assignments (digital pins 2-7)
 #define IN1 2  // Motor 1 direction pin
 #define IN2 3  // Motor 1 direction pin
 #define IN3 4  // Motor 2 direction pin
