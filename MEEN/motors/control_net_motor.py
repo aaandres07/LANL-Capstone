@@ -6,7 +6,7 @@ from evdev import InputDevice, ecodes
 # --- Configuration ---
 # Set the serial port where the Arduino is connected (update as needed)
 SERIAL_PORT = '/dev/ttyACM0'
-BAUD_RATE = 9600
+BAUD_RATE = 115200
 
 # Set the event device path for your PS5 controller (update this path accordingly)
 CONTROLLER_DEVICE = '/dev/input/event8'  # e.g., '/dev/input/event0'
