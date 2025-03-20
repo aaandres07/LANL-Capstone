@@ -20,7 +20,7 @@ ser = serial.Serial('/dev/ttyACM0', 115200, timeout=1)
 time.sleep(2)  # Wait for Arduino to reset
 
 # Define deadzone threshold
-DEADZONE = 10  # Any net value below this is treated as zero
+DEADZONE = 20  # Any net value below this is treated as zero
 
 # Initialize trigger values
 left_trigger = 0   # Typically from ABS_Z (L2)
