@@ -1,15 +1,19 @@
 // Define motor driver pin assignments for dual linear actuators
-#define IN1 2  // Actuator 1 direction pin 1
-#define IN2 3  // Actuator 1 direction pin 2
-#define IN3 4  // Actuator 2 direction pin 1
-#define IN4 5  // Actuator 2 direction pin 2
-#define ENA 6  // Actuator 1 PWM (speed)
-#define ENB 7  // Actuator 2 PWM (speed)
+#define IN1 2  // Left actuator direction pin 1
+#define IN2 3  // Left actuator direction pin 2
+#define IN3 4  // Right actuator direction pin 1
+#define IN4 5  // Right actuator direction pin 2
+#define ENA 6  // Left actuator PWM (speed)
+#define ENB 7  // Right actuator PWM (speed)
 
-// Calibration factors for each actuator
-// Adjust these factors based on testing until both actuators move at the same rate.
-float calibrationFactor1 = 0.99;  // Actuator 1 (e.g., left)
-float calibrationFactor2 = 1.0;  // Actuator 2 (e.g., right)
+// Calibration factors for each actuator for up and down directions
+// Adjust these constants based on testing:
+// - For up motion, if the right actuator is too fast, reduce its factor (e.g., 0.8).
+// - For down motion, if the left actuator is too fast, reduce its factor (e.g., 0.8).
+float calibrationFactorLeftUp = 1.0;    
+float calibrationFactorRightUp = 0.98;   
+float calibrationFactorLeftDown = 0.99;  
+float calibrationFactorRightDown = 1.0; 
 
 void setup() {
   Serial.begin(115200);
@@ -41,43 +45,49 @@ void loop() {
     // Read input until newline (expecting a single signed number)
     String input = Serial.readStringUntil('\n');
     int netSpeed = input.toInt();
-    
-    // Calculate the PWM values using calibration factors
-    int pwmVal1 = constrain(abs(netSpeed) * calibrationFactor1, 0, 255);
-    int pwmVal2 = constrain(abs(netSpeed) * calibrationFactor2, 0, 255);
+    int absSpeed = abs(netSpeed);
+    int pwmLeft, pwmRight;
     
     if (netSpeed > 0) {
-      // Both actuators move in one direction (e.g., up)
+      // Up motion
       digitalWrite(IN1, HIGH);
       digitalWrite(IN2, LOW);
       digitalWrite(IN3, HIGH);
       digitalWrite(IN4, LOW);
       
-      analogWrite(ENA, pwmVal1);
-      analogWrite(ENB, pwmVal2);
+      // Use calibration factors for up motion:
+      pwmLeft = constrain(absSpeed * calibrationFactorLeftUp, 0, 255);
+      pwmRight = constrain(absSpeed * calibrationFactorRightUp, 0, 255);
       
-      Serial.print("Moving up. PWM values: ");
-      Serial.print(pwmVal1);
-      Serial.print(" / ");
-      Serial.println(pwmVal2);
+      analogWrite(ENA, pwmLeft);
+      analogWrite(ENB, pwmRight);
+      
+      Serial.print("Moving up. Left PWM: ");
+      Serial.print(pwmLeft);
+      Serial.print(", Right PWM: ");
+      Serial.println(pwmRight);
     }
     else if (netSpeed < 0) {
-      // Both actuators move in the opposite direction (e.g., down)
+      // Down motion
       digitalWrite(IN1, LOW);
       digitalWrite(IN2, HIGH);
       digitalWrite(IN3, LOW);
       digitalWrite(IN4, HIGH);
       
-      analogWrite(ENA, pwmVal1);
-      analogWrite(ENB, pwmVal2);
+      // Use calibration factors for down motion:
+      pwmLeft = constrain(absSpeed * calibrationFactorLeftDown, 0, 255);
+      pwmRight = constrain(absSpeed * calibrationFactorRightDown, 0, 255);
       
-      Serial.print("Moving down. PWM values: ");
-      Serial.print(pwmVal1);
-      Serial.print(" / ");
-      Serial.println(pwmVal2);
+      analogWrite(ENA, pwmLeft);
+      analogWrite(ENB, pwmRight);
+      
+      Serial.print("Moving down. Left PWM: ");
+      Serial.print(pwmLeft);
+      Serial.print(", Right PWM: ");
+      Serial.println(pwmRight);
     }
     else {
-      // Stop both actuators
+      // Stop the actuators
       digitalWrite(IN1, LOW);
       digitalWrite(IN2, LOW);
       digitalWrite(IN3, LOW);
