@@ -8,7 +8,7 @@
 
 // Calibration factors for each actuator
 // Adjust these factors based on testing until both actuators move at the same rate.
-float calibrationFactor1 = 0.8;  // Actuator 1 (e.g., left)
+float calibrationFactor1 = 0.9;  // Actuator 1 (e.g., left)
 float calibrationFactor2 = 1.0;  // Actuator 2 (e.g., right)
 
 void setup() {
