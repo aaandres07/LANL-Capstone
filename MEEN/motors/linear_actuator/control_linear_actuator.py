@@ -30,9 +30,9 @@ for event in controller.read_loop():
         hat_y = event.value  # Typically: -1 for up, 0 for neutral, 1 for down
 
         # Map D-pad up to forward and down to reverse
-        if hat_y == -1:
+        if hat_y == 1:
             net_speed = FIXED_SPEED   # Forward
-        elif hat_y == 1:
+        elif hat_y == -1:
             net_speed = -FIXED_SPEED  # Reverse
         else:
             net_speed = 0  # Stop when the D-pad is released
