@@ -7,9 +7,7 @@
 #define ENB 7  // Right actuator PWM (speed)
 
 // Calibration factors for each actuator for up and down directions
-// Adjust these constants based on testing:
-// - For up motion, if the right actuator is too fast, reduce its factor (e.g., 0.8).
-// - For down motion, if the left actuator is too fast, reduce its factor (e.g., 0.8).
+// (These remain as originally set, but their outputs will be swapped.)
 float calibrationFactorLeftUp = 1.0;    
 float calibrationFactorRightUp = 0.98;   
 float calibrationFactorLeftDown = 0.99;  
@@ -46,45 +44,60 @@ void loop() {
     String input = Serial.readStringUntil('\n');
     int netSpeed = input.toInt();
     int absSpeed = abs(netSpeed);
-    int pwmLeft, pwmRight;
+    int pwmLeftOrig, pwmRightOrig;
+    int pwmLeftFlipped, pwmRightFlipped;
     
     if (netSpeed > 0) {
-      // Up motion
+      // Up motion originally:
+      // Left actuator: IN1 HIGH, IN2 LOW; Right actuator: IN3 HIGH, IN4 LOW.
+      // Now, we swap the PWM outputs.
       digitalWrite(IN1, HIGH);
       digitalWrite(IN2, LOW);
       digitalWrite(IN3, HIGH);
       digitalWrite(IN4, LOW);
       
-      // Use calibration factors for up motion:
-      pwmLeft = constrain(absSpeed * calibrationFactorLeftUp, 0, 255);
-      pwmRight = constrain(absSpeed * calibrationFactorRightUp, 0, 255);
+      // Calculate original PWM values for up motion
+      pwmLeftOrig = constrain(absSpeed * calibrationFactorLeftUp, 0, 255);
+      pwmRightOrig = constrain(absSpeed * calibrationFactorRightUp, 0, 255);
       
-      analogWrite(ENA, pwmLeft);
-      analogWrite(ENB, pwmRight);
+      // Flip the channels:
+      // Apply the right channel's PWM (pwmRightOrig) to the left actuator (ENA)
+      // and the left channel's PWM (pwmLeftOrig) to the right actuator (ENB).
+      pwmLeftFlipped = pwmRightOrig;
+      pwmRightFlipped = pwmLeftOrig;
       
-      Serial.print("Moving up. Left PWM: ");
-      Serial.print(pwmLeft);
+      analogWrite(ENA, pwmLeftFlipped);
+      analogWrite(ENB, pwmRightFlipped);
+      
+      Serial.print("Moving up (flipped). Left PWM: ");
+      Serial.print(pwmLeftFlipped);
       Serial.print(", Right PWM: ");
-      Serial.println(pwmRight);
+      Serial.println(pwmRightFlipped);
     }
     else if (netSpeed < 0) {
-      // Down motion
+      // Down motion originally:
+      // Left actuator: IN1 LOW, IN2 HIGH; Right actuator: IN3 LOW, IN4 HIGH.
+      // Now, we swap the PWM outputs.
       digitalWrite(IN1, LOW);
       digitalWrite(IN2, HIGH);
       digitalWrite(IN3, LOW);
       digitalWrite(IN4, HIGH);
       
-      // Use calibration factors for down motion:
-      pwmLeft = constrain(absSpeed * calibrationFactorLeftDown, 0, 255);
-      pwmRight = constrain(absSpeed * calibrationFactorRightDown, 0, 255);
+      // Calculate original PWM values for down motion
+      pwmLeftOrig = constrain(absSpeed * calibrationFactorLeftDown, 0, 255);
+      pwmRightOrig = constrain(absSpeed * calibrationFactorRightDown, 0, 255);
       
-      analogWrite(ENA, pwmLeft);
-      analogWrite(ENB, pwmRight);
+      // Swap the outputs:
+      pwmLeftFlipped = pwmRightOrig;
+      pwmRightFlipped = pwmLeftOrig;
       
-      Serial.print("Moving down. Left PWM: ");
-      Serial.print(pwmLeft);
+      analogWrite(ENA, pwmLeftFlipped);
+      analogWrite(ENB, pwmRightFlipped);
+      
+      Serial.print("Moving down (flipped). Left PWM: ");
+      Serial.print(pwmLeftFlipped);
       Serial.print(", Right PWM: ");
-      Serial.println(pwmRight);
+      Serial.println(pwmRightFlipped);
     }
     else {
       // Stop the actuators
