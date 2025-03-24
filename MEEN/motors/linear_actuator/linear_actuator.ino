@@ -8,8 +8,8 @@
 
 // Calibration factors for each actuator
 // Adjust these factors based on testing until both actuators move at the same rate.
-float calibrationFactor1 = 1.0;  // Actuator 1 (e.g., left)
-float calibrationFactor2 = 0.8;  // Actuator 2 (e.g., right)
+float calibrationFactor1 = 0.8;  // Actuator 1 (e.g., left)
+float calibrationFactor2 = 1.0;  // Actuator 2 (e.g., right)
 
 void setup() {
   Serial.begin(115200);
