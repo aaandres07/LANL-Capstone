@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import serial
 import time
-from evdev import InputDevice, categorize, ecodes, list_devices
+from evdev import InputDevice, ecodes, list_devices
 
 # Find the PS5 Controller (DualSense or Wireless Controller)
 devices = [InputDevice(path) for path in list_devices()]
@@ -19,37 +19,28 @@ if controller is None:
 ser = serial.Serial('/dev/ttyACM0', 115200, timeout=1)
 time.sleep(2)  # Wait for Arduino to reset
 
-# Define deadzone threshold
-DEADZONE = 20  # Any net value below this is treated as zero
+# Initialize bumper states
+left_bumper = 0  # BTN_TL
+right_bumper = 0  # BTN_TR
 
-# Initialize trigger values
-left_trigger = 0   # Typically from ABS_Z (L2)
-right_trigger = 0  # Typically from ABS_RZ (R2)
-
-print("Starting full-speed control loop. Use L2 and R2 for reverse/forward.")
+print("Starting full-speed control loop. Use Left and Right Bumpers for reverse/forward.")
 
 for event in controller.read_loop():
-    if event.type == ecodes.EV_ABS:
-        if event.code == ecodes.ABS_Z:
-            left_trigger = event.value
-        elif event.code == ecodes.ABS_RZ:
-            right_trigger = event.value
+    if event.type == ecodes.EV_KEY:
+        if event.code == ecodes.BTN_TL:
+            left_bumper = event.value
+        elif event.code == ecodes.BTN_TR:
+            right_bumper = event.value
 
-        net_speed = right_trigger - left_trigger
-
-        # Apply deadzone: if net_speed is small, treat it as zero
-        if abs(net_speed) < DEADZONE:
-            net_speed = 0
-
-        # Instead of variable speed, send full speed commands:
-        if net_speed > 0:
-            command = "255\n"
-        elif net_speed < 0:
-            command = "-255\n"
+        # Determine net command based on bumper states:
+        if right_bumper and not left_bumper:
+            command = "255\n"  # Full forward
+        elif left_bumper and not right_bumper:
+            command = "-255\n"  # Full reverse
         else:
-            command = "0\n"
+            command = "0\n"     # Stop
 
-        print(f"Left Trigger: {left_trigger}, Right Trigger: {right_trigger}, Net: {net_speed}")
+        print(f"Left Bumper: {left_bumper}, Right Bumper: {right_bumper}")
         print(f"Sending command: {command.strip()}")
         ser.write(command.encode('utf-8'))
 

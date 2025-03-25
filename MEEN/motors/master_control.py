@@ -80,24 +80,20 @@ def actuator_thread_func(ser, actuator_queue):
 
 # --- Net Motors Processing ---
 def net_motors_thread(ser, net_queue):
-    left_trigger = 0
-    right_trigger = 0
-    DEADZONE = 20  # Trigger deadzone threshold
+    left_bumper = 0
+    right_bumper = 0
     while True:
         event = net_queue.get()
-        if event.code == ecodes.ABS_Z:
-            left_trigger = event.value
-        elif event.code == ecodes.ABS_RZ:
-            right_trigger = event.value
+        # Expecting EV_KEY events for bumpers
+        if event.code == ecodes.BTN_TL:
+            left_bumper = event.value  # 1 if pressed, 0 if released
+        elif event.code == ecodes.BTN_TR:
+            right_bumper = event.value
 
-        net_speed = right_trigger - left_trigger
-        if abs(net_speed) < DEADZONE:
-            net_speed = 0
-
-        # Instead of variable speed, send full speed commands:
-        if net_speed > 0:
+        # Determine command based on bumper states:
+        if right_bumper and not left_bumper:
             command = "N:255\n"  # Full forward
-        elif net_speed < 0:
+        elif left_bumper and not right_bumper:
             command = "N:-255\n"  # Full reverse
         else:
             command = "N:0\n"   # Stop motors
@@ -127,6 +123,7 @@ for event in controller.read_loop():
         # Dispatch actuator events: D-pad vertical (ABS_HAT0Y)
         elif event.code == ecodes.ABS_HAT0Y:
             actuator_queue.put(event)
-        # Dispatch net motor events: Triggers (ABS_Z for L2, ABS_RZ for R2)
-        elif event.code in (ecodes.ABS_Z, ecodes.ABS_RZ):
+    elif event.type == ecodes.EV_KEY:
+        # Dispatch net motor events: Left bumper (BTN_TL) and Right bumper (BTN_TR)
+        if event.code in (ecodes.BTN_TL, ecodes.BTN_TR):
             net_queue.put(event)
