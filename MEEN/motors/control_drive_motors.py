@@ -23,7 +23,7 @@ time.sleep(2)  # Wait for Arduino to reset
 
 # Helper Function to Map Joystick Value to PWM
 def joystick_to_pwm(val):
-    # PS5 joystick range: -32768 to 32767 (should be -128 to 128)
+    # PS5 joystick range: -32767 to 32767 (should be -128 to 128)
     normalized_val = val / 32767  # Normalize to -1.0 to 1.0
     return int(1500 + (normalized_val * 1000))  # Map to 500 - 2500µs
 

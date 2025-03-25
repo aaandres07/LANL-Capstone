@@ -36,7 +36,7 @@ def drive_motors_thread(ser, drive_queue):
     right_val = 0
 
     def joystick_to_pwm(val):
-        # Map joystick range (-32768 to 32767) to PWM (500 to 2500 µs)
+        # Map joystick range (-32767 to 32767) to PWM (500 to 2500 µs)
         normalized_val = val / 32767.0
         return int(1500 + (normalized_val * 1000))
     
