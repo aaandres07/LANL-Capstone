@@ -1,122 +1,101 @@
-/*
-  Updated linear_actuator.ino
+// Define motor driver pin assignments for dual linear actuators
+#define IN1 2  // Left actuator direction pin 1
+#define IN2 3  // Left actuator direction pin 2
+#define IN3 4  // Right actuator direction pin 1
+#define IN4 5  // Right actuator direction pin 2
+#define ENA 6  // Left actuator PWM (speed)
+#define ENB 7  // Right actuator PWM (speed)
 
-  This code collects serial input until a newline is received.
-  When a complete command is available, it processes the command
-  and sends feedback back to the Python controller.
-
-  Pin assignments:
-  
-  Actuator 1:
-    IN1 -> Digital Pin 28
-    IN2 -> Digital Pin 29
-    ENA -> Digital Pin 4
-
-  Actuator 2:
-    IN3 -> Digital Pin 30
-    IN4 -> Digital Pin 31
-    ENA -> Digital Pin 5
-*/
-
-// Define pins for Actuator 1
-#define ACT1_IN1 28      // Motor driver input for Actuator 1 (IN1)
-#define ACT1_IN2 29      // Motor driver input for Actuator 1 (IN2)
-#define ACT1_ENA 4       // Enable pin for Actuator 1
-
-// Define pins for Actuator 2
-#define ACT2_IN1 30      // Motor driver input for Actuator 2 (IN3)
-#define ACT2_IN2 31      // Motor driver input for Actuator 2 (IN4)
-#define ACT2_ENA 5       // Enable pin for Actuator 2
-
-String inputString = "";     // A string to hold incoming data
-bool stringComplete = false; // Flag for when a full command is received
+// Calibration factors for each actuator for up and down directions
+// Adjust these constants based on testing:
+// - For up motion, if the right actuator is too fast, reduce its factor (e.g., 0.8).
+// - For down motion, if the left actuator is too fast, reduce its factor (e.g., 0.8).
+float calibrationFactorLeftUp = 1.0;    
+float calibrationFactorRightUp = 1.0;   
+float calibrationFactorLeftDown = 1.0;  
+float calibrationFactorRightDown = 1.0; 
 
 void setup() {
   Serial.begin(115200);
-
-  // Initialize Actuator 1 pins
-  pinMode(ACT1_IN1, OUTPUT);
-  pinMode(ACT1_IN2, OUTPUT);
-  pinMode(ACT1_ENA, OUTPUT);
-
-  // Initialize Actuator 2 pins
-  pinMode(ACT2_IN1, OUTPUT);
-  pinMode(ACT2_IN2, OUTPUT);
-  pinMode(ACT2_ENA, OUTPUT);
-
-  // Optionally, initialize actuators to a known state (stopped)
-  digitalWrite(ACT1_ENA, LOW);
-  digitalWrite(ACT2_ENA, LOW);
+  
+  // Set direction pins as outputs
+  pinMode(IN1, OUTPUT);
+  pinMode(IN2, OUTPUT);
+  pinMode(IN3, OUTPUT);
+  pinMode(IN4, OUTPUT);
+  
+  // Set PWM pins as outputs
+  pinMode(ENA, OUTPUT);
+  pinMode(ENB, OUTPUT);
+  
+  // Ensure actuators are stopped initially
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, LOW);
+  analogWrite(ENA, 0);
+  analogWrite(ENB, 0);
+  
+  Serial.println("Arduino ready.");
 }
 
 void loop() {
-  // Process the command only when a complete string is available
-  if (stringComplete) {
-    // Convert the received string to an integer command value
-    int commandValue = inputString.toInt();
-
-    // Process the command to control the actuators
-    controlActuator(commandValue);
-
-    // Send feedback for the current command back to the Python program
-    Serial.println(commandValue);
-
-    // Clear the input buffer for the next command
-    inputString = "";
-    stringComplete = false;
-  }
-}
-
-// Function to control the actuators based on the command value
-// Command mapping:
-//   1 -> Actuator 1 forward
-//   2 -> Actuator 1 reverse
-//   3 -> Actuator 2 forward
-//   4 -> Actuator 2 reverse
-//   default -> Stop both actuators
-void controlActuator(int commandValue) {
-  switch (commandValue) {
-    case 1:
-      // Actuator 1 forward
-      digitalWrite(ACT1_IN1, HIGH);
-      digitalWrite(ACT1_IN2, LOW);
-      digitalWrite(ACT1_ENA, HIGH);
-      break;
-    case 2:
-      // Actuator 1 reverse
-      digitalWrite(ACT1_IN1, LOW);
-      digitalWrite(ACT1_IN2, HIGH);
-      digitalWrite(ACT1_ENA, HIGH);
-      break;
-    case 3:
-      // Actuator 2 forward
-      digitalWrite(ACT2_IN1, HIGH);
-      digitalWrite(ACT2_IN2, LOW);
-      digitalWrite(ACT2_ENA, HIGH);
-      break;
-    case 4:
-      // Actuator 2 reverse
-      digitalWrite(ACT2_IN1, LOW);
-      digitalWrite(ACT2_IN2, HIGH);
-      digitalWrite(ACT2_ENA, HIGH);
-      break;
-    default:
-      // Stop both actuators
-      digitalWrite(ACT1_ENA, LOW);
-      digitalWrite(ACT2_ENA, LOW);
-      break;
-  }
-}
-
-// This function is automatically called when new serial data arrives.
-void serialEvent() {
-  while (Serial.available()) {
-    char inChar = (char)Serial.read();
-    // Check for newline character which indicates the end of a command
-    if (inChar == '\n') {
-      stringComplete = true;
-    } else {
-      inputString += inChar;
+  // Check if there is serial data available
+  if (Serial.available() > 0) {
+    // Read input until newline (expecting a single signed number)
+    String input = Serial.readStringUntil('\n');
+    int netSpeed = input.toInt();
+    int absSpeed = abs(netSpeed);
+    int pwmLeft, pwmRight;
+    
+    if (netSpeed > 0) {
+      // Up motion
+      digitalWrite(IN1, HIGH);
+      digitalWrite(IN2, LOW);
+      digitalWrite(IN3, HIGH);
+      digitalWrite(IN4, LOW);
+      
+      // Use calibration factors for up motion:
+      pwmLeft = constrain(absSpeed * calibrationFactorLeftUp, 0, 255);
+      pwmRight = constrain(absSpeed * calibrationFactorRightUp, 0, 255);
+      
+      analogWrite(ENA, pwmLeft);
+      analogWrite(ENB, pwmRight);
+      
+      Serial.print("Moving up. Left PWM: ");
+      Serial.print(pwmLeft);
+      Serial.print(", Right PWM: ");
+      Serial.println(pwmRight);
+    }
+    else if (netSpeed < 0) {
+      // Down motion
+      digitalWrite(IN1, LOW);
+      digitalWrite(IN2, HIGH);
+      digitalWrite(IN3, LOW);
+      digitalWrite(IN4, HIGH);
+      
+      // Use calibration factors for down motion:
+      pwmLeft = constrain(absSpeed * calibrationFactorLeftDown, 0, 255);
+      pwmRight = constrain(absSpeed * calibrationFactorRightDown, 0, 255);
+      
+      analogWrite(ENA, pwmLeft);
+      analogWrite(ENB, pwmRight);
+      
+      Serial.print("Moving down. Left PWM: ");
+      Serial.print(pwmLeft);
+      Serial.print(", Right PWM: ");
+      Serial.println(pwmRight);
+    }
+    else {
+      // Stop the actuators
+      digitalWrite(IN1, LOW);
+      digitalWrite(IN2, LOW);
+      digitalWrite(IN3, LOW);
+      digitalWrite(IN4, LOW);
+      analogWrite(ENA, 0);
+      analogWrite(ENB, 0);
+      
+      Serial.println("Actuators stopped.");
     }
   }
 }
