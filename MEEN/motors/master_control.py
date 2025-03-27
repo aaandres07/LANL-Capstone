@@ -58,38 +58,49 @@ cmd_lock = threading.Lock()
 def controller_event_loop():
     left_bumper = 0
     right_bumper = 0
+    controller.fd  # this is required to make sure it's still valid
 
-    for event in controller.read_loop():
-        with cmd_lock:
-            # Drive motors
-            if event.type == ecodes.EV_ABS:
-                if event.code == ecodes.ABS_Y:
-                    normalized = event.value / 32767.0
-                    shared_cmd.drive_left = int(1500 + (normalized * 1000))
-                elif event.code == ecodes.ABS_RY:
-                    normalized = event.value / 32767.0
-                    shared_cmd.drive_right = int(1500 + (normalized * 1000))
-                elif event.code == ecodes.ABS_HAT0Y:
-                    if event.value == -1:
-                        shared_cmd.actuator_cmd = 1
-                    elif event.value == 1:
-                        shared_cmd.actuator_cmd = 2
-                    else:
-                        shared_cmd.actuator_cmd = 0
+    while True:
+        try:
+            events = controller.read()
+            for event in events:
+                with cmd_lock:
+                    # Drive motors
+                    if event.type == ecodes.EV_ABS:
+                        if event.code == ecodes.ABS_Y:
+                            normalized = event.value / 32767.0
+                            shared_cmd.drive_left = int(1500 + (normalized * 1000))
+                        elif event.code == ecodes.ABS_RY:
+                            normalized = event.value / 32767.0
+                            shared_cmd.drive_right = int(1500 + (normalized * 1000))
+                        elif event.code == ecodes.ABS_HAT0Y:
+                            if event.value == -1:
+                                shared_cmd.actuator_cmd = 1
+                            elif event.value == 1:
+                                shared_cmd.actuator_cmd = 2
+                            else:
+                                shared_cmd.actuator_cmd = 0
 
-            # Net motors
-            elif event.type == ecodes.EV_KEY:
-                if event.code == ecodes.BTN_TL:
-                    left_bumper = event.value
-                elif event.code == ecodes.BTN_TR:
-                    right_bumper = event.value
+                    # Net motors
+                    elif event.type == ecodes.EV_KEY:
+                        if event.code == ecodes.BTN_TL:
+                            left_bumper = event.value
+                        elif event.code == ecodes.BTN_TR:
+                            right_bumper = event.value
 
-                if right_bumper and not left_bumper:
-                    shared_cmd.net_speed = 255
-                elif left_bumper and not right_bumper:
-                    shared_cmd.net_speed = -255
-                else:
-                    shared_cmd.net_speed = 0
+                        if right_bumper and not left_bumper:
+                            shared_cmd.net_speed = 255
+                        elif left_bumper and not right_bumper:
+                            shared_cmd.net_speed = -255
+                        else:
+                            shared_cmd.net_speed = 0
+
+        except BlockingIOError:
+            # No new events — expected in polling mode
+            pass
+        except Exception as e:
+            print(f"[Controller thread error] {e}")
+        time.sleep(0.01)
 
 # --- Serial Sender Thread ---
 def serial_sender():
