@@ -1,159 +1,127 @@
-#include <Servo.h>
+#!/usr/bin/env python3
+import threading
+import serial
+import time
+from evdev import InputDevice, list_devices, ecodes
+from dataclasses import dataclass, field
 
-// --- Servo motor setup ---
-Servo leftMotor;
-Servo rightMotor;
+@dataclass
+class ArduinoCommand:
+    drive_left: int = 1500
+    drive_right: int = 1500
+    net_speed: int = 0
+    actuator_cmd: int = 0
+    _last_serial: str = field(default="", init=False, repr=False)
 
-// --- Net motors ---
-const int IN1 = 22, IN2 = 23, IN3 = 24, IN4 = 25;  
-const int ENA = 6, ENB = 7;
+    def to_serial(self) -> str:
+        return f"D:{self.drive_left},{self.drive_right};N:{self.net_speed};A:{self.actuator_cmd}\n"
 
-// --- Linear Actuators ---
-const int ACT1_IN1 = 28, ACT1_IN2 = 29, ACT2_IN1 = 30, ACT2_IN2 = 31;
-const int ACT_ENA = 4, ACT_ENB = 5;
+    def changed(self) -> bool:
+        curr = self.to_serial()
+        if curr != self._last_serial:
+            self._last_serial = curr
+            return True
+        return False
 
-// --- Serial Input ---
-String input = "";
+    def describe(self) -> str:
+        left = 'deadzone' if self.drive_left == 1500 else str(self.drive_left)
+        right = 'deadzone' if self.drive_right == 1500 else str(self.drive_right)
+        net = 'deadzone' if self.net_speed == 0 else str(self.net_speed)
+        actuator = 'deadzone' if self.actuator_cmd == 0 else str(self.actuator_cmd)
+        return (
+            f"[{time.strftime('%H:%M:%S')}] Raspberry Pi Command:\n"
+            f"  Wheels: {left}, {right}\n"
+            f"  Net: {net}\n"
+            f"  Linear Actuators: {actuator}"
+        )
 
-// --- Last Command State ---
-int lastLeft = 1500;
-int lastRight = 1500;
-int lastNet = 0;
-int lastActuator = 0;
+# --- Serial setup ---
+try:
+    ser = serial.Serial('/dev/ttyACM0', 115200, timeout=1)
+    time.sleep(2)
+    print("[INFO] Serial connection to Arduino established.\n")
+except Exception as e:
+    print("[ERROR] Serial port failure:", e)
+    exit(1)
 
-// --- Heartbeat Timer ---
-unsigned long lastHeartbeat = 0;
+# --- Controller detection ---
+devices = [InputDevice(path) for path in list_devices()]
+controller = next((d for d in devices if 'Wireless Controller' in d.name or 'DualSense' in d.name), None)
+if not controller:
+    print("[ERROR] PS5 controller not found.")
+    exit(1)
 
-// --- Function Prototypes ---
-void controlDrive(int l, int r);
-void controlNet(int speed);
-void controlActuator(int cmd);
-void parseCommand(String cmd);
+print(f"[INFO] Connected to controller: {controller.name} ({controller.path})\n")
 
-void setup() {
-  Serial.begin(115200);
+shared_cmd = ArduinoCommand()
+cmd_lock = threading.Lock()
 
-  // Drive motors
-  leftMotor.attach(9);
-  rightMotor.attach(10);
-  leftMotor.writeMicroseconds(1500);
-  rightMotor.writeMicroseconds(1500);
+def apply_deadzone(value, threshold=0.1):
+    normalized = value / 32767.0
+    if abs(normalized) < threshold:
+        return 1500
+    return int(1500 + (normalized * 1000))
 
-  // Net motors
-  pinMode(IN1, OUTPUT); pinMode(IN2, OUTPUT);
-  pinMode(IN3, OUTPUT); pinMode(IN4, OUTPUT);
-  pinMode(ENA, OUTPUT); pinMode(ENB, OUTPUT);
+# --- Controller thread ---
+def controller_event_loop():
+    left_bumper = 0
+    right_bumper = 0
+    while True:
+        try:
+            events = controller.read()
+            for event in events:
+                with cmd_lock:
+                    if event.type == ecodes.EV_ABS:
+                        if event.code == ecodes.ABS_Y:
+                            shared_cmd.drive_left = apply_deadzone(event.value)
+                        elif event.code == ecodes.ABS_RY:
+                            shared_cmd.drive_right = apply_deadzone(event.value)
+                        elif event.code == ecodes.ABS_HAT0Y:
+                            shared_cmd.actuator_cmd = 1 if event.value == -1 else 2 if event.value == 1 else 0
+                    elif event.type == ecodes.EV_KEY:
+                        if event.code == ecodes.BTN_TL:
+                            left_bumper = event.value
+                        elif event.code == ecodes.BTN_TR:
+                            right_bumper = event.value
+                        shared_cmd.net_speed = 255 if right_bumper and not left_bumper else -255 if left_bumper and not right_bumper else 0
+        except BlockingIOError:
+            pass
+        except Exception as e:
+            print(f"[Controller Error] {e}")
+        time.sleep(0.01)
 
-  // Actuators
-  pinMode(ACT1_IN1, OUTPUT); pinMode(ACT1_IN2, OUTPUT);
-  pinMode(ACT2_IN1, OUTPUT); pinMode(ACT2_IN2, OUTPUT);
-  pinMode(ACT_ENA, OUTPUT); pinMode(ACT_ENB, OUTPUT);
-}
+# --- Serial thread ---
+def serial_sender():
+    print("[INFO] Serial sender thread running.\n")
+    while True:
+        with cmd_lock:
+            if shared_cmd.changed():
+                cmd = shared_cmd.to_serial()
+                print(shared_cmd.describe())
+                try:
+                    ser.reset_input_buffer()
+                    ser.write(cmd.encode('utf-8'))
+                    print(f"  ↪ Sent: {cmd.strip()}")
+                    start = time.time()
+                    response = ''
+                    while True:
+                        if ser.in_waiting:
+                            response = ser.readline().decode('utf-8').strip()
+                            break
+                        if time.time() - start > 1:
+                            response = "[Timeout waiting for Arduino]"
+                            break
+                        time.sleep(0.01)
+                    print(f"  ↩ Arduino: {response}\n")
+                except Exception as e:
+                    print(f"[ERROR] Serial write failed: {e}")
+        time.sleep(0.05)
 
-void loop() {
-  // Heartbeat every 5 seconds
-  if (millis() - lastHeartbeat >= 5000) {
-    Serial.println("[Arduino] alive");
-    lastHeartbeat = millis();
-  }
+# --- Launch threads ---
+threading.Thread(target=controller_event_loop, daemon=True).start()
+threading.Thread(target=serial_sender, daemon=True).start()
 
-  while (Serial.available()) {
-    char c = Serial.read();
-    if (c == '\n') {
-      input.trim();  // Clean whitespace
-      if (input.length() > 0) {
-        Serial.println("Raw command: " + input);
-        parseCommand(input);
-      }
-      input = "";
-    } else {
-      input += c;
-      if (input.length() > 100) {
-        Serial.println("Warning: input too long, resetting");
-        input = "";
-      }
-    }
-  }
-}
+print("[INFO] Master control running. Use PS5 controller to operate.\n")
 
-void parseCommand(String cmd) {
-  int d = cmd.indexOf("D:");
-  int n = cmd.indexOf("N:");
-  int a = cmd.indexOf("A:");
-
-  if (d != -1) {
-    int comma = cmd.indexOf(",", d);
-    int semi = cmd.indexOf(";", d);
-    if (comma != -1 && semi != -1) {
-      int left = cmd.substring(d + 2, comma).toInt();
-      int right = cmd.substring(comma + 1, semi).toInt();
-      controlDrive(left, right);
-      lastLeft = left;
-      lastRight = right;
-    }
-  }
-
-  if (n != -1) {
-    int semi = cmd.indexOf(";", n);
-    if (semi == -1) semi = cmd.length();
-    int net = cmd.substring(n + 2, semi).toInt();
-    controlNet(net);
-    lastNet = net;
-  }
-
-  if (a != -1) {
-    int actuator = cmd.substring(a + 2).toInt();
-    controlActuator(actuator);
-    lastActuator = actuator;
-  }
-
-  // Print status
-  Serial.println("Arduino Command State:");
-  Serial.print("  Wheels: ");
-  Serial.print((lastLeft == 1500) ? "deadzone" : String(lastLeft));
-  Serial.print(", ");
-  Serial.println((lastRight == 1500) ? "deadzone" : String(lastRight));
-  Serial.print("  Net: ");
-  Serial.println((lastNet == 0) ? "deadzone" : String(lastNet));
-  Serial.print("  Linear Actuators: ");
-  Serial.println((lastActuator == 0) ? "deadzone" : String(lastActuator));
-}
-
-void controlDrive(int l, int r) {
-  l = constrain(l, 1000, 2000);
-  r = constrain(r, 1000, 2000);
-  leftMotor.writeMicroseconds(l);
-  rightMotor.writeMicroseconds(r);
-}
-
-void controlNet(int speed) {
-  if (speed > 0) {
-    digitalWrite(IN1, HIGH); digitalWrite(IN2, LOW);
-    digitalWrite(IN3, HIGH); digitalWrite(IN4, LOW);
-    analogWrite(ENA, 255); analogWrite(ENB, 255);
-  } else if (speed < 0) {
-    digitalWrite(IN1, LOW); digitalWrite(IN2, HIGH);
-    digitalWrite(IN3, LOW); digitalWrite(IN4, HIGH);
-    analogWrite(ENA, 255); analogWrite(ENB, 255);
-  } else {
-    digitalWrite(IN1, LOW); digitalWrite(IN2, LOW);
-    digitalWrite(IN3, LOW); digitalWrite(IN4, LOW);
-    analogWrite(ENA, 0); analogWrite(ENB, 0);
-  }
-}
-
-void controlActuator(int cmd) {
-  if (cmd == 1) {
-    digitalWrite(ACT1_IN1, HIGH); digitalWrite(ACT1_IN2, LOW);
-    digitalWrite(ACT2_IN1, HIGH); digitalWrite(ACT2_IN2, LOW);
-    analogWrite(ACT_ENA, 255); analogWrite(ACT_ENB, 255);
-  } else if (cmd == 2) {
-    digitalWrite(ACT1_IN1, LOW); digitalWrite(ACT1_IN2, HIGH);
-    digitalWrite(ACT2_IN1, LOW); digitalWrite(ACT2_IN2, HIGH);
-    analogWrite(ACT_ENA, 255); analogWrite(ACT_ENB, 255);
-  } else {
-    digitalWrite(ACT1_IN1, LOW); digitalWrite(ACT1_IN2, LOW);
-    digitalWrite(ACT2_IN1, LOW); digitalWrite(ACT2_IN2, LOW);
-    analogWrite(ACT_ENA, 0); analogWrite(ACT_ENB, 0);
-  }
-}
+while True:
+    time.sleep(1)
