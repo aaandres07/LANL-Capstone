@@ -11,7 +11,6 @@ class ArduinoCommand:
     drive_right: int = 1500
     net_speed: int = 0
     actuator_cmd: int = 0
-
     _last_serial: str = field(default="", init=False, repr=False)
 
     def to_serial(self) -> str:
@@ -36,7 +35,7 @@ class ArduinoCommand:
             f"  Linear Actuators: {actuator}"
         )
 
-# --- Shared Serial Interface ---
+# --- Serial setup ---
 try:
     ser = serial.Serial('/dev/ttyACM0', 115200, timeout=1)
     time.sleep(2)
@@ -45,38 +44,28 @@ except Exception as e:
     print("[ERROR] Serial port failure:", e)
     exit(1)
 
-# --- Locate the PS5 Controller ---
+# --- Controller detection ---
 devices = [InputDevice(path) for path in list_devices()]
-controller = None
-for device in devices:
-    if 'Wireless Controller' in device.name or 'DualSense' in device.name:
-        controller = device
-        break
-
-if controller is None:
-    print("[ERROR] PS5 controller not found. Please connect your controller.")
+controller = next((d for d in devices if 'Wireless Controller' in d.name or 'DualSense' in d.name), None)
+if not controller:
+    print("[ERROR] PS5 controller not found.")
     exit(1)
 
 print(f"[INFO] Connected to controller: {controller.name} ({controller.path})\n")
 
-# --- Command State ---
 shared_cmd = ArduinoCommand()
 cmd_lock = threading.Lock()
 
-# --- Helper Function ---
 def apply_deadzone(value, threshold=0.1):
     normalized = value / 32767.0
     if abs(normalized) < threshold:
         return 1500
     return int(1500 + (normalized * 1000))
 
-# --- Unified Input Event Handler Thread ---
+# --- Controller thread ---
 def controller_event_loop():
     left_bumper = 0
     right_bumper = 0
-
-    print("[INFO] Controller input thread running.\n")
-
     while True:
         try:
             events = controller.read()
@@ -88,33 +77,20 @@ def controller_event_loop():
                         elif event.code == ecodes.ABS_RY:
                             shared_cmd.drive_right = apply_deadzone(event.value)
                         elif event.code == ecodes.ABS_HAT0Y:
-                            if event.value == -1:
-                                shared_cmd.actuator_cmd = 1
-                            elif event.value == 1:
-                                shared_cmd.actuator_cmd = 2
-                            else:
-                                shared_cmd.actuator_cmd = 0
-
+                            shared_cmd.actuator_cmd = 1 if event.value == -1 else 2 if event.value == 1 else 0
                     elif event.type == ecodes.EV_KEY:
                         if event.code == ecodes.BTN_TL:
                             left_bumper = event.value
                         elif event.code == ecodes.BTN_TR:
                             right_bumper = event.value
-
-                        if right_bumper and not left_bumper:
-                            shared_cmd.net_speed = 255
-                        elif left_bumper and not right_bumper:
-                            shared_cmd.net_speed = -255
-                        else:
-                            shared_cmd.net_speed = 0
-
+                        shared_cmd.net_speed = 255 if right_bumper and not left_bumper else -255 if left_bumper and not right_bumper else 0
         except BlockingIOError:
-            pass  # no new events
+            pass
         except Exception as e:
-            print(f"[ERROR] Controller thread crashed: {e}")
+            print(f"[Controller Error] {e}")
         time.sleep(0.01)
 
-# --- Serial Sender Thread ---
+# --- Serial thread ---
 def serial_sender():
     print("[INFO] Serial sender thread running.\n")
     while True:
@@ -123,23 +99,29 @@ def serial_sender():
                 cmd = shared_cmd.to_serial()
                 print(shared_cmd.describe())
                 try:
+                    ser.reset_input_buffer()
                     ser.write(cmd.encode('utf-8'))
                     print(f"  ↪ Sent: {cmd.strip()}")
-                    response = ser.readline().decode('utf-8').strip()
-                    if response:
-                        print(f"  ↩ Arduino: {response}\n")
-                    else:
-                        print("  ⚠ Warning: No response from Arduino\n")
+                    start = time.time()
+                    response = ''
+                    while True:
+                        if ser.in_waiting:
+                            response = ser.readline().decode('utf-8').strip()
+                            break
+                        if time.time() - start > 1:
+                            response = "[Timeout waiting for Arduino]"
+                            break
+                        time.sleep(0.01)
+                    print(f"  ↩ Arduino: {response}\n")
                 except Exception as e:
-                    print(f"[ERROR] Serial communication failed: {e}")
+                    print(f"[ERROR] Serial write failed: {e}")
         time.sleep(0.05)
 
-# --- Start Threads ---
+# --- Launch threads ---
 threading.Thread(target=controller_event_loop, daemon=True).start()
 threading.Thread(target=serial_sender, daemon=True).start()
 
-print("[INFO] Master control running. Use the PS5 controller to drive your bot!\n")
+print("[INFO] Master control running. Use PS5 controller to operate.\n")
 
-# Keep alive
 while True:
     time.sleep(1)
