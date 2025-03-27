@@ -56,18 +56,11 @@ print(f"[INFO] Connected to controller: {controller.name} ({controller.path})\n"
 shared_cmd = ArduinoCommand()
 cmd_lock = threading.Lock()
 
-def apply_deadzone(value, threshold=0.1):
-    normalized = value / 32767.0
-    if abs(normalized) < threshold:
-        return 1500
-    return int(1500 + (normalized * 1000))
-
-def map_joystick_to_pwm(value, deadzone=10):
-    center = 128
+# --- Joystick mapping with deadzone ---
+def map_joystick_to_pwm(value, center=128, deadzone=15, scale=4):
     offset = value - center
     if abs(offset) < deadzone:
         return 1500
-    scale = 4  # Adjust to map joystick delta to 1000–2000 range
     pwm = int(1500 + offset * scale)
     return max(1000, min(2000, pwm))
 
@@ -81,10 +74,10 @@ def controller_event_loop():
             for event in events:
                 with cmd_lock:
                     if event.type == ecodes.EV_ABS:
-                    if event.code == ecodes.ABS_Y:
-                        shared_cmd.drive_left = map_joystick_to_pwm(event.value)
-                    elif event.code == ecodes.ABS_RY:
-                        shared_cmd.drive_right = map_joystick_to_pwm(event.value)
+                        if event.code == ecodes.ABS_Y:
+                            shared_cmd.drive_left = map_joystick_to_pwm(event.value)
+                        elif event.code == ecodes.ABS_RY:
+                            shared_cmd.drive_right = map_joystick_to_pwm(event.value)
                         elif event.code == ecodes.ABS_HAT0Y:
                             shared_cmd.actuator_cmd = 1 if event.value == -1 else 2 if event.value == 1 else 0
                     elif event.type == ecodes.EV_KEY:
@@ -92,7 +85,11 @@ def controller_event_loop():
                             left_bumper = event.value
                         elif event.code == ecodes.BTN_TR:
                             right_bumper = event.value
-                        shared_cmd.net_speed = 255 if right_bumper and not left_bumper else -255 if left_bumper and not right_bumper else 0
+                        shared_cmd.net_speed = (
+                            255 if right_bumper and not left_bumper else
+                            -255 if left_bumper and not right_bumper else
+                            0
+                        )
         except BlockingIOError:
             pass
         except Exception as e:
