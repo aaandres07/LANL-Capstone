@@ -41,22 +41,22 @@ void setup() {
 }
 
 void loop() {
-  // Heartbeat every 2 seconds
-  if (millis() - lastHeartbeat >= 2000) {
-    Serial.println("Arduino alive");
+  if (millis() - lastHeartbeat >= 5000) {
+    Serial.println("[Arduino] alive");
     lastHeartbeat = millis();
   }
 
   while (Serial.available()) {
     char c = Serial.read();
     if (c == '\n') {
-      Serial.println("Raw command: " + input); // DEBUG echo
-      parseCommand(input);
+      input.trim();  // Remove stray \r or whitespace
+      if (input.length() > 0) {
+        Serial.println("Raw command: " + input);
+        parseCommand(input);
+      }
       input = "";
     } else {
       input += c;
-
-      // Prevent runaway input string
       if (input.length() > 100) {
         Serial.println("Warning: input too long, resetting");
         input = "";
@@ -96,14 +96,14 @@ void parseCommand(String cmd) {
     lastActuator = actuator;
   }
 
-  Serial.println("Arduino:");
-  Serial.print("  Wheels - ");
+  Serial.println("Arduino Command State:");
+  Serial.print("  Wheels: ");
   Serial.print((lastLeft == 1500) ? "deadzone" : String(lastLeft));
   Serial.print(", ");
   Serial.println((lastRight == 1500) ? "deadzone" : String(lastRight));
-  Serial.print("  Net - ");
+  Serial.print("  Net: ");
   Serial.println((lastNet == 0) ? "deadzone" : String(lastNet));
-  Serial.print("  Linear Actuators - ");
+  Serial.print("  Linear Actuators: ");
   Serial.println((lastActuator == 0) ? "deadzone" : String(lastActuator));
 }
 
@@ -116,32 +116,4 @@ void controlDrive(int l, int r) {
 
 void controlNet(int speed) {
   if (speed > 0) {
-    digitalWrite(IN1, HIGH); digitalWrite(IN2, LOW);
-    digitalWrite(IN3, HIGH); digitalWrite(IN4, LOW);
-    analogWrite(ENA, 255); analogWrite(ENB, 255);
-  } else if (speed < 0) {
-    digitalWrite(IN1, LOW); digitalWrite(IN2, HIGH);
-    digitalWrite(IN3, LOW); digitalWrite(IN4, HIGH);
-    analogWrite(ENA, 255); analogWrite(ENB, 255);
-  } else {
-    digitalWrite(IN1, LOW); digitalWrite(IN2, LOW);
-    digitalWrite(IN3, LOW); digitalWrite(IN4, LOW);
-    analogWrite(ENA, 0); analogWrite(ENB, 0);
-  }
-}
-
-void controlActuator(int cmd) {
-  if (cmd == 1) {
-    digitalWrite(ACT1_IN1, HIGH); digitalWrite(ACT1_IN2, LOW);
-    digitalWrite(ACT2_IN1, HIGH); digitalWrite(ACT2_IN2, LOW);
-    analogWrite(ACT_ENA, 255); analogWrite(ACT_ENB, 255);
-  } else if (cmd == 2) {
-    digitalWrite(ACT1_IN1, LOW); digitalWrite(ACT1_IN2, HIGH);
-    digitalWrite(ACT2_IN1, LOW); digitalWrite(ACT2_IN2, HIGH);
-    analogWrite(ACT_ENA, 255); analogWrite(ACT_ENB, 255);
-  } else {
-    digitalWrite(ACT1_IN1, LOW); digitalWrite(ACT1_IN2, LOW);
-    digitalWrite(ACT2_IN1, LOW); digitalWrite(ACT2_IN2, LOW);
-    analogWrite(ACT_ENA, 0); analogWrite(ACT_ENB, 0);
-  }
-}
+    digitalWrite(IN1, HIGH);
