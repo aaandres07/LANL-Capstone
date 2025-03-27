@@ -31,6 +31,7 @@ class ArduinoCommand:
 try:
     ser = serial.Serial('/dev/ttyACM0', 115200, timeout=1)
     time.sleep(2)
+    print("Serial connection to Arduino established.")
 except Exception as e:
     print("Error opening serial port:", e)
     exit(1)
@@ -47,8 +48,11 @@ if controller is None:
     print("PS5 controller not found. Please connect your controller.")
     exit(1)
 
+print(f"Connected to controller: {controller.name} ({controller.path})")
+
 # --- Command State ---
 shared_cmd = ArduinoCommand()
+cmd_lock = threading.Lock()
 
 # --- Drive Motors Thread ---
 def drive_thread():
@@ -56,57 +60,61 @@ def drive_thread():
         normalized = val / 32767.0
         return int(1500 + (normalized * 1000))
 
-    while True:
-        event = controller.read_one()
-        if event and event.type == ecodes.EV_ABS:
-            if event.code == ecodes.ABS_Y:
-                shared_cmd.drive_left = joystick_to_pwm(event.value)
-            elif event.code == ecodes.ABS_RY:
-                shared_cmd.drive_right = joystick_to_pwm(event.value)
-        time.sleep(0.01)
+    for event in controller.read_loop():
+        if event.type == ecodes.EV_ABS:
+            with cmd_lock:
+                if event.code == ecodes.ABS_Y:
+                    shared_cmd.drive_left = joystick_to_pwm(event.value)
+                elif event.code == ecodes.ABS_RY:
+                    shared_cmd.drive_right = joystick_to_pwm(event.value)
 
 # --- Net Motors Thread ---
 def net_thread():
     left_bumper = 0
     right_bumper = 0
-    while True:
-        event = controller.read_one()
-        if event and event.type == ecodes.EV_KEY:
-            if event.code == ecodes.BTN_TL:
-                left_bumper = event.value
-            elif event.code == ecodes.BTN_TR:
-                right_bumper = event.value
+    for event in controller.read_loop():
+        if event.type == ecodes.EV_KEY:
+            with cmd_lock:
+                if event.code == ecodes.BTN_TL:
+                    left_bumper = event.value
+                elif event.code == ecodes.BTN_TR:
+                    right_bumper = event.value
 
-            if right_bumper and not left_bumper:
-                shared_cmd.net_speed = 255
-            elif left_bumper and not right_bumper:
-                shared_cmd.net_speed = -255
-            else:
-                shared_cmd.net_speed = 0
-        time.sleep(0.01)
+                if right_bumper and not left_bumper:
+                    shared_cmd.net_speed = 255
+                elif left_bumper and not right_bumper:
+                    shared_cmd.net_speed = -255
+                else:
+                    shared_cmd.net_speed = 0
 
 # --- Actuator Thread ---
 def actuator_thread():
-    while True:
-        event = controller.read_one()
-        if event and event.type == ecodes.EV_ABS and event.code == ecodes.ABS_HAT0Y:
-            if event.value == -1:
-                shared_cmd.actuator_cmd = 1
-            elif event.value == 1:
-                shared_cmd.actuator_cmd = 2
-            else:
-                shared_cmd.actuator_cmd = 0
-        time.sleep(0.01)
+    for event in controller.read_loop():
+        if event.type == ecodes.EV_ABS and event.code == ecodes.ABS_HAT0Y:
+            with cmd_lock:
+                if event.value == -1:
+                    shared_cmd.actuator_cmd = 1
+                elif event.value == 1:
+                    shared_cmd.actuator_cmd = 2
+                else:
+                    shared_cmd.actuator_cmd = 0
 
 # --- Serial Sender Thread ---
 def serial_sender():
     while True:
-        cmd = shared_cmd.to_serial()
-        print(shared_cmd.describe())
-        ser.write(cmd.encode('utf-8'))
-        response = ser.readline().decode('utf-8').strip()
-        if response:
-            print(f"{response}")
+        with cmd_lock:
+            cmd = shared_cmd.to_serial()
+            print(shared_cmd.describe())
+        try:
+            ser.write(cmd.encode('utf-8'))
+            print(f"[{time.strftime('%H:%M:%S')}] Sent to Arduino: {cmd.strip()}")
+            response = ser.readline().decode('utf-8').strip()
+            if response:
+                print(f"Received from Arduino: {response}")
+            else:
+                print("Warning: No response from Arduino")
+        except Exception as e:
+            print(f"Serial communication error: {e}")
         time.sleep(0.05)
 
 # --- Start Threads ---
