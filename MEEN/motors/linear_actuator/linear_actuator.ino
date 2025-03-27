@@ -17,7 +17,7 @@ float calibrationFactorRightDown = 1.0;
 
 void setup() {
   Serial.begin(115200);
-  
+
   // Set direction pins as outputs
   pinMode(IN1, OUTPUT);
   pinMode(IN2, OUTPUT);
@@ -27,7 +27,7 @@ void setup() {
   // Set PWM pins as outputs
   pinMode(ENA, OUTPUT);
   pinMode(ENB, OUTPUT);
-  
+
   // Ensure actuators are stopped initially
   digitalWrite(IN1, LOW);
   digitalWrite(IN2, LOW);
@@ -66,7 +66,7 @@ void loop() {
       Serial.print(pwmLeft);
       Serial.print(", Right PWM: ");
       Serial.println(pwmRight);
-    }
+}
     else if (netSpeed < 0) {
       // Down motion
       digitalWrite(IN1, LOW);
