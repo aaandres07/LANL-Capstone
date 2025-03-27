@@ -62,6 +62,15 @@ def apply_deadzone(value, threshold=0.1):
         return 1500
     return int(1500 + (normalized * 1000))
 
+def map_joystick_to_pwm(value, deadzone=10):
+    center = 128
+    offset = value - center
+    if abs(offset) < deadzone:
+        return 1500
+    scale = 4  # Adjust to map joystick delta to 1000–2000 range
+    pwm = int(1500 + offset * scale)
+    return max(1000, min(2000, pwm))
+
 # --- Controller thread ---
 def controller_event_loop():
     left_bumper = 0
@@ -72,10 +81,10 @@ def controller_event_loop():
             for event in events:
                 with cmd_lock:
                     if event.type == ecodes.EV_ABS:
-                        if event.code == ecodes.ABS_Y:
-                            shared_cmd.drive_left = apply_deadzone(event.value)
-                        elif event.code == ecodes.ABS_RY:
-                            shared_cmd.drive_right = apply_deadzone(event.value)
+                    if event.code == ecodes.ABS_Y:
+                        shared_cmd.drive_left = map_joystick_to_pwm(event.value)
+                    elif event.code == ecodes.ABS_RY:
+                        shared_cmd.drive_right = map_joystick_to_pwm(event.value)
                         elif event.code == ecodes.ABS_HAT0Y:
                             shared_cmd.actuator_cmd = 1 if event.value == -1 else 2 if event.value == 1 else 0
                     elif event.type == ecodes.EV_KEY:
