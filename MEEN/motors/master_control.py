@@ -54,27 +54,31 @@ print(f"Connected to controller: {controller.name} ({controller.path})")
 shared_cmd = ArduinoCommand()
 cmd_lock = threading.Lock()
 
-# --- Drive Motors Thread ---
-def drive_thread():
-    def joystick_to_pwm(val):
-        normalized = val / 32767.0
-        return int(1500 + (normalized * 1000))
-
-    for event in controller.read_loop():
-        if event.type == ecodes.EV_ABS:
-            with cmd_lock:
-                if event.code == ecodes.ABS_Y:
-                    shared_cmd.drive_left = joystick_to_pwm(event.value)
-                elif event.code == ecodes.ABS_RY:
-                    shared_cmd.drive_right = joystick_to_pwm(event.value)
-
-# --- Net Motors Thread ---
-def net_thread():
+# --- Unified Input Event Handler Thread ---
+def controller_event_loop():
     left_bumper = 0
     right_bumper = 0
+
     for event in controller.read_loop():
-        if event.type == ecodes.EV_KEY:
-            with cmd_lock:
+        with cmd_lock:
+            # Drive motors
+            if event.type == ecodes.EV_ABS:
+                if event.code == ecodes.ABS_Y:
+                    normalized = event.value / 32767.0
+                    shared_cmd.drive_left = int(1500 + (normalized * 1000))
+                elif event.code == ecodes.ABS_RY:
+                    normalized = event.value / 32767.0
+                    shared_cmd.drive_right = int(1500 + (normalized * 1000))
+                elif event.code == ecodes.ABS_HAT0Y:
+                    if event.value == -1:
+                        shared_cmd.actuator_cmd = 1
+                    elif event.value == 1:
+                        shared_cmd.actuator_cmd = 2
+                    else:
+                        shared_cmd.actuator_cmd = 0
+
+            # Net motors
+            elif event.type == ecodes.EV_KEY:
                 if event.code == ecodes.BTN_TL:
                     left_bumper = event.value
                 elif event.code == ecodes.BTN_TR:
@@ -86,18 +90,6 @@ def net_thread():
                     shared_cmd.net_speed = -255
                 else:
                     shared_cmd.net_speed = 0
-
-# --- Actuator Thread ---
-def actuator_thread():
-    for event in controller.read_loop():
-        if event.type == ecodes.EV_ABS and event.code == ecodes.ABS_HAT0Y:
-            with cmd_lock:
-                if event.value == -1:
-                    shared_cmd.actuator_cmd = 1
-                elif event.value == 1:
-                    shared_cmd.actuator_cmd = 2
-                else:
-                    shared_cmd.actuator_cmd = 0
 
 # --- Serial Sender Thread ---
 def serial_sender():
@@ -118,9 +110,7 @@ def serial_sender():
         time.sleep(0.05)
 
 # --- Start Threads ---
-threading.Thread(target=drive_thread, daemon=True).start()
-threading.Thread(target=net_thread, daemon=True).start()
-threading.Thread(target=actuator_thread, daemon=True).start()
+threading.Thread(target=controller_event_loop, daemon=True).start()
 threading.Thread(target=serial_sender, daemon=True).start()
 
 print("Master control running. Press buttons or joysticks to control motors.")
