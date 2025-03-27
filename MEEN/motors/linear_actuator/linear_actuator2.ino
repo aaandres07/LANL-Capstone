@@ -12,12 +12,12 @@
   Full-speed is achieved by simply setting the enable pins HIGH (and LOW to stop).
 */
 
-const int IN1 = 22;
-const int IN2 = 23;
-const int IN3 = 24;
-const int IN4 = 25;
-const int ENA = 6;  // Digital control for Motor 1
-const int ENB = 7;  // Digital control for Motor 2
+const int IN1 = 28;
+const int IN2 = 29;
+const int IN3 = 30;
+const int IN4 = 31;
+const int ENA = 4;  // Digital control for Motor 1
+const int ENB = 5;  // Digital control for Motor 2
 
 String inputString = "";   // Buffer for incoming serial data
 bool stringComplete = false;
@@ -42,7 +42,7 @@ void setup() {
   analogWrite(ENB, 0);
 
   Serial.begin(115200);
-  Serial.println("Motor controller ready (full-speed digital control).");
+  Serial.println("Motor controller ready.");
 }
 
 void loop() {
@@ -62,7 +62,7 @@ void loop() {
     inputString = "";
     stringComplete = false;
 
-    if (command > 0) {
+    if (command > 10) {
       // Full forward
       digitalWrite(IN1, HIGH);
       digitalWrite(IN2, LOW);
@@ -71,7 +71,7 @@ void loop() {
       // Set enable pins 255 for full power
       analogWrite(ENA, 255);
       analogWrite(ENB, 255);
-    } else if (command < 0) {
+    } else if (command < 10) {
       // Full reverse
       digitalWrite(IN1, LOW);
       digitalWrite(IN2, HIGH);
@@ -86,8 +86,8 @@ void loop() {
       digitalWrite(IN2, LOW);
       digitalWrite(IN3, LOW);
       digitalWrite(IN4, LOW);
-      analogWrite(ENA, 0);
-      analogWrite(ENB, 0);
+      digitalWrite(ENA, 0);
+      digitalWrite(ENB, 0);
     }
 
     // Optionally, send feedback over Serial
