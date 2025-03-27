@@ -3,7 +3,7 @@
 Servo leftMotor;
 Servo rightMotor;
 
-// Net Motors
+// Net motors
 const int IN1 = 22, IN2 = 23, IN3 = 24, IN4 = 25;  
 const int ENA = 6, ENB = 7;
 
@@ -12,6 +12,11 @@ const int ACT1_IN1 = 28, ACT1_IN2 = 29, ACT2_IN1 = 30, ACT2_IN2 = 31;
 const int ACT_ENA = 4, ACT_ENB = 5;
 
 String input = "";
+
+int lastLeft = 1500;
+int lastRight = 1500;
+int lastNet = 0;
+int lastActuator = 0;
 
 void setup() {
   Serial.begin(115200);
@@ -56,6 +61,8 @@ void parseCommand(String cmd) {
     int left = cmd.substring(d + 2, comma).toInt();
     int right = cmd.substring(comma + 1, semi).toInt();
     controlDrive(left, right);
+    lastLeft = left;
+    lastRight = right;
   }
 
   if (n != -1) {
@@ -63,14 +70,24 @@ void parseCommand(String cmd) {
     if (semi == -1) semi = cmd.length();
     int net = cmd.substring(n + 2, semi).toInt();
     controlNet(net);
+    lastNet = net;
   }
 
   if (a != -1) {
     int actuator = cmd.substring(a + 2).toInt();
     controlActuator(actuator);
+    lastActuator = actuator;
   }
 
-  Serial.println("Parsed command.");
+  Serial.println("Arduino:");
+  Serial.print("  Wheels - ");
+  Serial.print((lastLeft == 1500) ? "deadzone" : String(lastLeft));
+  Serial.print(", ");
+  Serial.println((lastRight == 1500) ? "deadzone" : String(lastRight));
+  Serial.print("  Net - ");
+  Serial.println((lastNet == 0) ? "deadzone" : String(lastNet));
+  Serial.print("  Linear Actuators - ");
+  Serial.println((lastActuator == 0) ? "deadzone" : String(lastActuator));
 }
 
 void controlDrive(int l, int r) {
