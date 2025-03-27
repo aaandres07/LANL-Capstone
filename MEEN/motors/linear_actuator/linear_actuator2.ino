@@ -1,23 +1,19 @@
 /*
   Arduino Motor Controller for 2-Channel Driver (Full Speed Digital Control)
-  Updated Pin assignments:
-    - Motor 1: IN1 = D22, IN2 = D23, ENA (digital) = D6
-    - Motor 2: IN3 = D24, IN4 = D25, ENB (digital) = D7
-  
   The Arduino reads a command from the Raspberry Pi:
     "255" for full-speed forward,
-    "-255" for full-speed reverse,
     "0" to stop.
-  
-  Full-speed is achieved by simply setting the enable pins HIGH (and LOW to stop).
 */
 
-const int IN1 = 28;
-const int IN2 = 29;
-const int IN3 = 30;
-const int IN4 = 31;
-const int ENA = 4;  // Digital control for Motor 1
-const int ENB = 5;  // Digital control for Motor 2
+// Motor 1
+const int IN1 = 28; //IN1 = D28
+const int IN2 = 29; //IN2 = D29
+const int ENA = 4;  //ENA = D4 PWM
+
+// Motor 2
+const int IN3 = 30; //IN3 = D30
+const int IN4 = 31; //IN4 = D31
+const int ENB = 5;  //ENB = D5 PWM
 
 String inputString = "";   // Buffer for incoming serial data
 bool stringComplete = false;
@@ -33,7 +29,7 @@ void setup() {
   pinMode(ENA, OUTPUT);
   pinMode(ENB, OUTPUT);
 
-  // Initialize all pins to LOW (motors off)
+  // Initialize all pins to LOW and 0 (motors off)
   digitalWrite(IN1, LOW);
   digitalWrite(IN2, LOW);
   digitalWrite(IN3, LOW);
@@ -62,22 +58,26 @@ void loop() {
     inputString = "";
     stringComplete = false;
 
-    if (command > 10) {
+    if (command > 10) { //setting 10 instead of 0 provides deadzone
       // Full forward
       digitalWrite(IN1, HIGH);
       digitalWrite(IN2, LOW);
       digitalWrite(IN3, HIGH);
       digitalWrite(IN4, LOW);
+
       // Set enable pins 255 for full power
+      // Can edit between 0 to 255 to calibrate
       analogWrite(ENA, 255);
       analogWrite(ENB, 255);
-    } else if (command < 10) {
+    } else if (command < 10) { //setting 10 instead of 0 provides deadzone
       // Full reverse
       digitalWrite(IN1, LOW);
       digitalWrite(IN2, HIGH);
       digitalWrite(IN3, LOW);
       digitalWrite(IN4, HIGH);
+      
       // Set enable pins 255 for full power
+      // Can edit between 0 to 255 to calibrate
       analogWrite(ENA, 255);
       analogWrite(ENB, 255);
     } else {
