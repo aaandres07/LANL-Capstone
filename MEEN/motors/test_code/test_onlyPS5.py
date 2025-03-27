@@ -3,7 +3,7 @@ from evdev import InputDevice, categorize, ecodes
 
 # Adjust the path based on your device
 devices = [InputDevice(path) for path in list_devices()]
-controller = next((d for d in devices if 'Wireless Controller' in d.name or 'DualSense' in d.name), None)
+ps5_controller = next((d for d in devices if 'Wireless Controller' in d.name or 'DualSense' in d.name), None)
 if not controller:
     print("[ERROR] PS5 controller not found.")
     exit(1)
