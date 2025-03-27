@@ -18,6 +18,8 @@ int lastRight = 1500;
 int lastNet = 0;
 int lastActuator = 0;
 
+unsigned long lastHeartbeat = 0;
+
 void setup() {
   Serial.begin(115200);
 
@@ -39,13 +41,26 @@ void setup() {
 }
 
 void loop() {
+  // Heartbeat every 2 seconds
+  if (millis() - lastHeartbeat >= 2000) {
+    Serial.println("Arduino alive");
+    lastHeartbeat = millis();
+  }
+
   while (Serial.available()) {
     char c = Serial.read();
     if (c == '\n') {
+      Serial.println("Raw command: " + input); // DEBUG echo
       parseCommand(input);
       input = "";
     } else {
       input += c;
+
+      // Prevent runaway input string
+      if (input.length() > 100) {
+        Serial.println("Warning: input too long, resetting");
+        input = "";
+      }
     }
   }
 }
@@ -58,11 +73,13 @@ void parseCommand(String cmd) {
   if (d != -1) {
     int comma = cmd.indexOf(",", d);
     int semi = cmd.indexOf(";", d);
-    int left = cmd.substring(d + 2, comma).toInt();
-    int right = cmd.substring(comma + 1, semi).toInt();
-    controlDrive(left, right);
-    lastLeft = left;
-    lastRight = right;
+    if (comma != -1 && semi != -1) {
+      int left = cmd.substring(d + 2, comma).toInt();
+      int right = cmd.substring(comma + 1, semi).toInt();
+      controlDrive(left, right);
+      lastLeft = left;
+      lastRight = right;
+    }
   }
 
   if (n != -1) {
