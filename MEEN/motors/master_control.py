@@ -15,6 +15,18 @@ class ArduinoCommand:
     def to_serial(self) -> str:
         return f"D:{self.drive_left},{self.drive_right};N:{self.net_speed};A:{self.actuator_cmd}\n"
 
+    def describe(self) -> str:
+        left = 'deadzone' if self.drive_left == 1500 else str(self.drive_left)
+        right = 'deadzone' if self.drive_right == 1500 else str(self.drive_right)
+        net = 'deadzone' if self.net_speed == 0 else str(self.net_speed)
+        actuator = 'deadzone' if self.actuator_cmd == 0 else str(self.actuator_cmd)
+        return (
+            f"Raspberry Pi:\n"
+            f"  Wheels - {left}, {right}\n"
+            f"  Net - {net}\n"
+            f"  Linear Actuators - {actuator}"
+        )
+
 # --- Shared Serial Interface ---
 try:
     ser = serial.Serial('/dev/ttyACM0', 115200, timeout=1)
@@ -90,10 +102,11 @@ def actuator_thread():
 def serial_sender():
     while True:
         cmd = shared_cmd.to_serial()
+        print(shared_cmd.describe())
         ser.write(cmd.encode('utf-8'))
         response = ser.readline().decode('utf-8').strip()
         if response:
-            print(f"Arduino: {response}")
+            print(f"{response}")
         time.sleep(0.05)
 
 # --- Start Threads ---
