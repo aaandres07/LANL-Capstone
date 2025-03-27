@@ -1,14 +1,24 @@
 #!/usr/bin/env python3
 import threading
-import queue
 import serial
 import time
 from evdev import InputDevice, list_devices, ecodes
+from dataclasses import dataclass
+
+@dataclass
+class ArduinoCommand:
+    drive_left: int = 1500
+    drive_right: int = 1500
+    net_speed: int = 0
+    actuator_cmd: int = 0
+
+    def to_serial(self) -> str:
+        return f"D:{self.drive_left},{self.drive_right};N:{self.net_speed};A:{self.actuator_cmd}\n"
 
 # --- Shared Serial Interface ---
 try:
     ser = serial.Serial('/dev/ttyACM0', 115200, timeout=1)
-    time.sleep(2)  # Allow time for Arduino to reset
+    time.sleep(2)
 except Exception as e:
     print("Error opening serial port:", e)
     exit(1)
@@ -25,105 +35,75 @@ if controller is None:
     print("PS5 controller not found. Please connect your controller.")
     exit(1)
 
-# --- Queues for dispatching events ---
-drive_queue = queue.Queue()
-actuator_queue = queue.Queue()
-net_queue = queue.Queue()
+# --- Command State ---
+shared_cmd = ArduinoCommand()
 
-# --- Drive Motors Processing ---
-def drive_motors_thread(ser, drive_queue):
-    left_val = 0
-    right_val = 0
-
+# --- Drive Motors Thread ---
+def drive_thread():
     def joystick_to_pwm(val):
-        # Map joystick range (-32767 to 32767) to PWM (500 to 2500 µs)
-        normalized_val = val / 32767.0
-        return int(1500 + (normalized_val * 1000))
-    
+        normalized = val / 32767.0
+        return int(1500 + (normalized * 1000))
+
     while True:
-        event = drive_queue.get()
-        # Update left/right joystick values as events come in.
-        if event.code == ecodes.ABS_Y:
-            left_val = event.value
-        elif event.code == ecodes.ABS_RY:
-            right_val = event.value
+        event = controller.read_one()
+        if event and event.type == ecodes.EV_ABS:
+            if event.code == ecodes.ABS_Y:
+                shared_cmd.drive_left = joystick_to_pwm(event.value)
+            elif event.code == ecodes.ABS_RY:
+                shared_cmd.drive_right = joystick_to_pwm(event.value)
+        time.sleep(0.01)
 
-        left_pwm = joystick_to_pwm(left_val)
-        right_pwm = joystick_to_pwm(right_val)
-        # Prepend "D:" to signal drive motor commands.
-        command = f"D:{left_pwm},{right_pwm}\n"
-        ser.write(command.encode('utf-8'))
-        # Optionally, print Arduino feedback:
-        response = ser.readline().decode('utf-8').strip()
-        if response:
-            print(f"Drive Motors - Arduino: {response}")
-        drive_queue.task_done()
-
-# --- Linear Actuator Processing ---
-def actuator_thread_func(ser, actuator_queue):
-    # For this example, we assume D-pad up/down controls actuator 1.
-    # Mapping: D-pad up (hat_y == -1) → actuator forward; down (hat_y == 1) → actuator reverse.
-    while True:
-        event = actuator_queue.get()
-        hat_y = event.value
-        if hat_y == -1:
-            command = "A:1\n"  # Actuator 1 forward
-        elif hat_y == 1:
-            command = "A:2\n"  # Actuator 1 reverse
-        else:
-            command = "A:0\n"  # Stop actuators
-        ser.write(command.encode('utf-8'))
-        response = ser.readline().decode('utf-8').strip()
-        if response:
-            print(f"Linear Actuators - Arduino: {response}")
-        actuator_queue.task_done()
-
-# --- Net Motors Processing ---
-def net_motors_thread(ser, net_queue):
+# --- Net Motors Thread ---
+def net_thread():
     left_bumper = 0
     right_bumper = 0
     while True:
-        event = net_queue.get()
-        # Expecting EV_KEY events for bumpers
-        if event.code == ecodes.BTN_TL:
-            left_bumper = event.value  # 1 if pressed, 0 if released
-        elif event.code == ecodes.BTN_TR:
-            right_bumper = event.value
+        event = controller.read_one()
+        if event and event.type == ecodes.EV_KEY:
+            if event.code == ecodes.BTN_TL:
+                left_bumper = event.value
+            elif event.code == ecodes.BTN_TR:
+                right_bumper = event.value
 
-        # Determine command based on bumper states:
-        if right_bumper and not left_bumper:
-            command = "N:255\n"  # Full forward
-        elif left_bumper and not right_bumper:
-            command = "N:-255\n"  # Full reverse
-        else:
-            command = "N:0\n"   # Stop motors
-        ser.write(command.encode('utf-8'))
+            if right_bumper and not left_bumper:
+                shared_cmd.net_speed = 255
+            elif left_bumper and not right_bumper:
+                shared_cmd.net_speed = -255
+            else:
+                shared_cmd.net_speed = 0
+        time.sleep(0.01)
+
+# --- Actuator Thread ---
+def actuator_thread():
+    while True:
+        event = controller.read_one()
+        if event and event.type == ecodes.EV_ABS and event.code == ecodes.ABS_HAT0Y:
+            if event.value == -1:
+                shared_cmd.actuator_cmd = 1
+            elif event.value == 1:
+                shared_cmd.actuator_cmd = 2
+            else:
+                shared_cmd.actuator_cmd = 0
+        time.sleep(0.01)
+
+# --- Serial Sender Thread ---
+def serial_sender():
+    while True:
+        cmd = shared_cmd.to_serial()
+        ser.write(cmd.encode('utf-8'))
         response = ser.readline().decode('utf-8').strip()
         if response:
-            print(f"Net Motors - Arduino: {response}")
-        net_queue.task_done()
+            print(f"Arduino: {response}")
+        time.sleep(0.05)
 
 # --- Start Threads ---
-drive_thread = threading.Thread(target=drive_motors_thread, args=(ser, drive_queue), daemon=True)
-actuator_thread_obj = threading.Thread(target=actuator_thread_func, args=(ser, actuator_queue), daemon=True)
-net_thread = threading.Thread(target=net_motors_thread, args=(ser, net_queue), daemon=True)
+threading.Thread(target=drive_thread, daemon=True).start()
+threading.Thread(target=net_thread, daemon=True).start()
+threading.Thread(target=actuator_thread, daemon=True).start()
+threading.Thread(target=serial_sender, daemon=True).start()
 
-drive_thread.start()
-actuator_thread_obj.start()
-net_thread.start()
+print("Master control running. Press buttons or joysticks to control motors.")
 
-# --- Main Event Loop: Dispatch Controller Events ---
-print("Starting master control loop. Listening for controller events...")
-
-for event in controller.read_loop():
-    if event.type == ecodes.EV_ABS:
-        # Dispatch drive motor events: Left joystick (ABS_Y) and right joystick (ABS_RY)
-        if event.code in (ecodes.ABS_Y, ecodes.ABS_RY):
-            drive_queue.put(event)
-        # Dispatch actuator events: D-pad vertical (ABS_HAT0Y)
-        elif event.code == ecodes.ABS_HAT0Y:
-            actuator_queue.put(event)
-    elif event.type == ecodes.EV_KEY:
-        # Dispatch net motor events: Left bumper (BTN_TL) and Right bumper (BTN_TR)
-        if event.code in (ecodes.BTN_TL, ecodes.BTN_TR):
-            net_queue.put(event)
+# Keep alive
+while True:
+    time.sleep(1)
