@@ -101,14 +101,17 @@ void controlDrive(int l, int r) {
 
 void controlNet(int speed) {
   if (speed > 0) {
+    // extend net
     digitalWrite(IN1, HIGH); digitalWrite(IN2, LOW);
     digitalWrite(IN3, HIGH); digitalWrite(IN4, LOW);
     analogWrite(ENA, 255); analogWrite(ENB, 255);
   } else if (speed < 0) {
+    // retract net
     digitalWrite(IN1, LOW); digitalWrite(IN2, HIGH);
     digitalWrite(IN3, LOW); digitalWrite(IN4, HIGH);
     analogWrite(ENA, 255); analogWrite(ENB, 255);
   } else {
+    // stop
     digitalWrite(IN1, LOW); digitalWrite(IN2, LOW);
     digitalWrite(IN3, LOW); digitalWrite(IN4, LOW);
     analogWrite(ENA, 0); analogWrite(ENB, 0);
@@ -117,14 +120,17 @@ void controlNet(int speed) {
 
 void controlActuator(int cmd) {
   if (cmd == 1) {
+    // up
     digitalWrite(ACT1_IN1, HIGH); digitalWrite(ACT1_IN2, LOW);
     digitalWrite(ACT2_IN1, HIGH); digitalWrite(ACT2_IN2, LOW);
-    analogWrite(ACT_ENA, 255); analogWrite(ACT_ENB, 255);
+    analogWrite(ACT_ENA, 240); analogWrite(ACT_ENB, 255); // Calibration Right (240); Left (255)
   } else if (cmd == 2) {
+    // down
     digitalWrite(ACT1_IN1, LOW); digitalWrite(ACT1_IN2, HIGH);
     digitalWrite(ACT2_IN1, LOW); digitalWrite(ACT2_IN2, HIGH);
-    analogWrite(ACT_ENA, 255); analogWrite(ACT_ENB, 255);
+    analogWrite(ACT_ENA, 255); analogWrite(ACT_ENB, 250); // Calibration Right (255); Left (250)
   } else {
+    // stop
     digitalWrite(ACT1_IN1, LOW); digitalWrite(ACT1_IN2, LOW);
     digitalWrite(ACT2_IN1, LOW); digitalWrite(ACT2_IN2, LOW);
     analogWrite(ACT_ENA, 0); analogWrite(ACT_ENB, 0);
