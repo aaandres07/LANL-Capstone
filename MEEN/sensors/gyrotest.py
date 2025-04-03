@@ -80,4 +80,4 @@ if __name__ == '__main__':
             print("Adjusted Roll: {:.2f}°, Adjusted Pitch: {:.2f}°".format(adjusted_roll, adjusted_pitch))
             time.sleep(0.5)
     except KeyboardInterrupt:
-        print("\nProgram stopped by user")                                                                         2,1           Top
+        print("Program stopped by user")
