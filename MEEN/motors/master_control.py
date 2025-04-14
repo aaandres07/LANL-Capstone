@@ -11,10 +11,11 @@ class ArduinoCommand:
     drive_right: int = 1500
     net_speed: int = 0
     actuator_cmd: int = 0
+    rocket_ignite: bool = False
     _last_serial: str = field(default="", init=False, repr=False)
 
     def to_serial(self) -> str:
-        return f"D:{self.drive_left},{self.drive_right};N:{self.net_speed};A:{self.actuator_cmd}\n"
+        return f"D:{self.drive_left},{self.drive_right};N:{self.net_speed};A:{self.actuator_cmd};R:{int(self.rocket_ignite)}\n"
 
     def changed(self) -> bool:
         curr = self.to_serial()
@@ -28,11 +29,13 @@ class ArduinoCommand:
         right = 'deadzone' if self.drive_right == 1500 else str(self.drive_right)
         net = 'deadzone' if self.net_speed == 0 else str(self.net_speed)
         actuator = 'deadzone' if self.actuator_cmd == 0 else str(self.actuator_cmd)
+        rocket = 'ON' if self.rocket_ignite else 'OFF'
         return (
             f"[{time.strftime('%H:%M:%S')}] Raspberry Pi Command:\n"
             f"  Wheels: {left}, {right}\n"
             f"  Net: {net}\n"
-            f"  Linear Actuators: {actuator}"
+            f"  Linear Actuators: {actuator}\n"
+            f"  Rocket: {rocket}"
         )
 
 # --- Serial setup ---
@@ -85,6 +88,8 @@ def controller_event_loop():
                             left_bumper = event.value
                         elif event.code == ecodes.BTN_TR:
                             right_bumper = event.value
+                        elif event.code == ecodes.BTN_SOUTH:  # Square button
+                            shared_cmd.rocket_ignite = bool(event.value)
                         shared_cmd.net_speed = (
                             255 if right_bumper and not left_bumper else
                             -255 if left_bumper and not right_bumper else
