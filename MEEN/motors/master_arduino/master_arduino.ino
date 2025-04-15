@@ -120,7 +120,7 @@ void controlNet(int speed) { //net motors calibrated (4/15/25)
   if (speed > 0) { // extend net
     digitalWrite(IN1, HIGH); digitalWrite(IN2, LOW);
     digitalWrite(IN3, HIGH); digitalWrite(IN4, LOW);
-    analogWrite(ENA, 255); analogWrite(ENB, 228); // Prev Calibration Left (255); Right (227)
+    analogWrite(ENA, 255); analogWrite(ENB, 233); // Prev Calibration Left (255); Right (227)
   } else if (speed < 0) { // retract net
     digitalWrite(IN1, LOW); digitalWrite(IN2, HIGH);
     digitalWrite(IN3, LOW); digitalWrite(IN4, HIGH);
@@ -136,7 +136,7 @@ void controlActuator(int cmd) { //linear actuators calibrated (4/15/25)
   if (cmd == 1) { // up
     digitalWrite(ACT1_IN1, HIGH); digitalWrite(ACT1_IN2, LOW);
     digitalWrite(ACT2_IN1, HIGH); digitalWrite(ACT2_IN2, LOW);
-    analogWrite(ACT_ENA, 255); analogWrite(ACT_ENB, 253); // Prev Calibration Left (255); Right (251)
+    analogWrite(ACT_ENA, 255); analogWrite(ACT_ENB, 254); // Prev Calibration Left (255); Right (251)
   } else if (cmd == 2) { //down
     digitalWrite(ACT1_IN1, LOW); digitalWrite(ACT1_IN2, HIGH);
     digitalWrite(ACT2_IN1, LOW); digitalWrite(ACT2_IN2, HIGH);
