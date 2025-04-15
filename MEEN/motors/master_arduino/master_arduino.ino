@@ -116,32 +116,32 @@ void controlDrive(int l, int r) {
   leftMotor.writeMicroseconds(l); rightMotor.writeMicroseconds(r);
 }
 
-void controlNet(int speed) {
-  if (speed > 0) {
+void controlNet(int speed) { //net motors calibrated (4/15/25)
+  if (speed > 0) { // extend net
     digitalWrite(IN1, HIGH); digitalWrite(IN2, LOW);
     digitalWrite(IN3, HIGH); digitalWrite(IN4, LOW);
-    analogWrite(ENA, 255); analogWrite(ENB, 227);
-  } else if (speed < 0) {
+    analogWrite(ENA, 255); analogWrite(ENB, 228); // Prev Calibration Left (255); Right (227)
+  } else if (speed < 0) { // retract net
     digitalWrite(IN1, LOW); digitalWrite(IN2, HIGH);
     digitalWrite(IN3, LOW); digitalWrite(IN4, HIGH);
-    analogWrite(ENA, 255); analogWrite(ENB, 239);
-  } else {
+    analogWrite(ENA, 255); analogWrite(ENB, 240); // Prev Calibration Left (255); Right (238)
+  } else { //stop
     digitalWrite(IN1, LOW); digitalWrite(IN2, LOW);
     digitalWrite(IN3, LOW); digitalWrite(IN4, LOW);
     analogWrite(ENA, 0); analogWrite(ENB, 0); 
   }
 }
 
-void controlActuator(int cmd) {
-  if (cmd == 1) {
+void controlActuator(int cmd) { //linear actuators calibrated (4/15/25)
+  if (cmd == 1) { // up
     digitalWrite(ACT1_IN1, HIGH); digitalWrite(ACT1_IN2, LOW);
     digitalWrite(ACT2_IN1, HIGH); digitalWrite(ACT2_IN2, LOW);
-    analogWrite(ACT_ENA, 255); analogWrite(ACT_ENB, 253);
-  } else if (cmd == 2) {
+    analogWrite(ACT_ENA, 255); analogWrite(ACT_ENB, 253); // Prev Calibration Left (255); Right (251)
+  } else if (cmd == 2) { //down
     digitalWrite(ACT1_IN1, LOW); digitalWrite(ACT1_IN2, HIGH);
     digitalWrite(ACT2_IN1, LOW); digitalWrite(ACT2_IN2, HIGH);
-    analogWrite(ACT_ENA, 249); analogWrite(ACT_ENB, 255);
-  } else {
+    analogWrite(ACT_ENA, 251); analogWrite(ACT_ENB, 255); // Prev Calibration Left (249); Right (255)
+  } else { //stop
     digitalWrite(ACT1_IN1, LOW); digitalWrite(ACT1_IN2, LOW);
     digitalWrite(ACT2_IN1, LOW); digitalWrite(ACT2_IN2, LOW);
     analogWrite(ACT_ENA, 0); analogWrite(ACT_ENB, 0);
