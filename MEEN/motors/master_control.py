@@ -88,7 +88,7 @@ def controller_event_loop():
                             left_bumper = event.value
                         elif event.code == ecodes.BTN_TR:
                             right_bumper = event.value
-                        elif event.code == ecodes.BTN_SOUTH:  # Square button
+                        elif event.code == ecodes.BTN_WEST:  # Square button
                             shared_cmd.rocket_ignite = bool(event.value)
                         shared_cmd.net_speed = (
                             255 if right_bumper and not left_bumper else
