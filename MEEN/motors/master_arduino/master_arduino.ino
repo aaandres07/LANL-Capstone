@@ -9,7 +9,7 @@ const int ENA = 6, ENB = 7;
 const int ACT1_IN1 = 28, ACT1_IN2 = 29, ACT2_IN1 = 30, ACT2_IN2 = 31;
 const int ACT_ENA = 4, ACT_ENB = 5;
 
-const int ROCKET_PIN = 50;
+const int ROCKET_PIN = 48;
 
 String input = "";
 int lastLeft = 1500, lastRight = 1500, lastNet = 0, lastActuator = 0, lastRocket = 0;
@@ -33,7 +33,7 @@ void setup() {
   pinMode(ACT_ENA, OUTPUT); pinMode(ACT_ENB, OUTPUT);
 
   pinMode(ROCKET_PIN, OUTPUT);
-  digitalWrite(ROCKET_PIN, LOW);
+  // digitalWrite(ROCKET_PIN, LOW);
 }
 
 void loop() {
@@ -132,15 +132,15 @@ void controlNet(int speed) { //net motors calibrated (4/15/25)
   }
 }
 
-void controlActuator(int cmd) { //linear actuators calibrated (4/15/25)
+void controlActuator(int cmd) { //linear actuators calibrated (4/19/25)
   if (cmd == 1) { // up
     digitalWrite(ACT1_IN1, HIGH); digitalWrite(ACT1_IN2, LOW);
     digitalWrite(ACT2_IN1, HIGH); digitalWrite(ACT2_IN2, LOW);
-    analogWrite(ACT_ENA, 255); analogWrite(ACT_ENB, 254); // Prev Calibration Left (255); Right (251)
+    analogWrite(ACT_ENA, 255); analogWrite(ACT_ENB, 244); // Prev Calibration Left (255); Right (251)
   } else if (cmd == 2) { //down
     digitalWrite(ACT1_IN1, LOW); digitalWrite(ACT1_IN2, HIGH);
     digitalWrite(ACT2_IN1, LOW); digitalWrite(ACT2_IN2, HIGH);
-    analogWrite(ACT_ENA, 251); analogWrite(ACT_ENB, 255); // Prev Calibration Left (249); Right (255)
+    analogWrite(ACT_ENA, 255); analogWrite(ACT_ENB, 252); // Prev Calibration Left (249); Right (255)
   } else { //stop
     digitalWrite(ACT1_IN1, LOW); digitalWrite(ACT1_IN2, LOW);
     digitalWrite(ACT2_IN1, LOW); digitalWrite(ACT2_IN2, LOW);
